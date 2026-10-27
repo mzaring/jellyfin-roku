@@ -1,0 +1,146 @@
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/TimerControl.bs"
+
+const COLOR_LEADING = "0x5CE07AFF"
+const COLOR_NEUTRAL = "0xFFFFFFFF"
+const COLOR_MUTED = "0xAAAAAAFF"
+const COLOR_WARNING = "0xFFCC66FF"
+const DEFAULT_POLL_SECONDS = 30
+const MIN_POLL_SECONDS = 10
+
+' Fantasy matchup overlay.
+'
+' Shown/hidden by the parent (VideoPlayerView) via the built-in `visible` field.
+' While visible it polls the fantasy proxy named by `fantasy_endpoint` in the
+' manifest every `fantasy_poll_seconds` seconds and renders the result.
+sub init()
+    m.weekLabel = m.top.findNode("weekLabel")
+    m.myName = m.top.findNode("myName")
+    m.myProj = m.top.findNode("myProj")
+    m.myScore = m.top.findNode("myScore")
+    m.oppName = m.top.findNode("oppName")
+    m.oppProj = m.top.findNode("oppProj")
+    m.oppScore = m.top.findNode("oppScore")
+
+    appInfo = createObject("roAppInfo")
+    m.endpoint = appInfo.getValue("fantasy_endpoint")
+
+    pollSeconds = Val(appInfo.getValue("fantasy_poll_seconds"))
+    if pollSeconds < MIN_POLL_SECONDS then pollSeconds = DEFAULT_POLL_SECONDS
+
+    m.pollTimer = m.top.findNode("pollTimer")
+    m.pollTimer.duration = pollSeconds
+    m.pollTimer.observeField("fire", "onPollTick")
+
+    m.task = createObject("roSGNode", "FantasyTask")
+    m.task.observeField("result", "onResult")
+
+    m.hasData = false
+    m.top.observeField("visible", "onVisibleChange")
+end sub
+
+' onVisibleChange: fetch immediately when shown, and only poll while shown
+sub onVisibleChange()
+    if m.top.visible
+        if not m.hasData
+            m.weekLabel.color = COLOR_MUTED
+            m.weekLabel.text = "Loading fantasy data..."
+        end if
+        refresh()
+        m.pollTimer.control = TimerControl.START
+    else
+        m.pollTimer.control = TimerControl.STOP
+    end if
+end sub
+
+sub onPollTick()
+    refresh()
+end sub
+
+sub refresh()
+    ' Don't stack requests if the last one is still running
+    if m.task.state = "run" then return
+
+    m.task.url = m.endpoint
+    m.task.control = TaskControl.RUN
+end sub
+
+sub onResult(event as object)
+    result = event.getData()
+
+    if result.ok = true
+        render(result.data)
+    else
+        showError(toText(result.error))
+    end if
+end sub
+
+sub render(data as dynamic)
+    if type(data) <> "roAssociativeArray"
+        showError("Unexpected data from fantasy service")
+        return
+    end if
+
+    label = toText(data.label)
+    stale = data.stale = true
+
+    ' Bye week or no matchup scheduled
+    if data.bye = true
+        m.hasData = true
+        clearRows()
+        m.weekLabel.color = COLOR_MUTED
+        m.weekLabel.text = label + " - no matchup"
+        return
+    end if
+
+    if type(data.me) <> "roAssociativeArray" or type(data.opp) <> "roAssociativeArray"
+        showError("Unexpected data from fantasy service")
+        return
+    end if
+
+    m.hasData = true
+
+    m.weekLabel.text = stale ? label + "  (out of date)" : label
+    m.weekLabel.color = stale ? COLOR_WARNING : COLOR_MUTED
+
+    lead = toText(data.lead)
+    applySide(data.me, m.myName, m.myProj, m.myScore, lead = "me")
+    applySide(data.opp, m.oppName, m.oppProj, m.oppScore, lead = "opp")
+end sub
+
+sub applySide(side as object, nameLabel as object, projLabel as object, scoreLabel as object, isLeading as boolean)
+    color = isLeading ? COLOR_LEADING : COLOR_NEUTRAL
+
+    nameLabel.text = toText(side.name)
+    scoreLabel.text = toText(side.score)
+    scoreLabel.color = color
+    projLabel.text = toText(side.proj)
+end sub
+
+sub clearRows()
+    m.myName.text = ""
+    m.myProj.text = ""
+    m.myScore.text = ""
+    m.oppName.text = ""
+    m.oppProj.text = ""
+    m.oppScore.text = ""
+end sub
+
+' showError: keep the last good scores on screen (marked out of date) if we have them
+sub showError(message as string)
+    m.weekLabel.color = COLOR_WARNING
+
+    if m.hasData
+        m.weekLabel.text = "Out of date: " + message
+    else
+        clearRows()
+        m.weekLabel.text = message
+    end if
+end sub
+
+' toText: Label.text must be a string, so never hand it invalid or a number
+function toText(value as dynamic) as string
+    if value = invalid then return ""
+    if GetInterface(value, "ifString") <> invalid then return value
+    return ""
+end function

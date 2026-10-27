@@ -1,0 +1,15 @@
+{
+  "name": "fantasy-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ESPN fantasy football matchup service for the Jellyfin Roku overlay",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "test": "node --test test.js"
+  },
+  "engines": {
+    "node": ">=22.9"
+  }
+}

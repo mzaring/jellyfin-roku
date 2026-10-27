@@ -1,0 +1,69 @@
+const REQUEST_TIMEOUT_MS = 8000
+
+sub init()
+    m.top.functionName = "fetchMatchup"
+end sub
+
+' fetchMatchup: GET the fantasy proxy and publish the parsed result on the `result` field.
+'
+' The proxy does all the ESPN work (cookies, parsing, formatting), so this only
+' needs to fetch a small JSON document and hand it back.
+sub fetchMatchup()
+    url = m.top.url
+    if url = ""
+        m.top.result = { ok: false, error: "Set fantasy_endpoint in the manifest" }
+        return
+    end if
+
+    port = createObject("roMessagePort")
+    request = createObject("roUrlTransfer")
+    request.setMessagePort(port)
+    request.setUrl(url)
+    request.setRequest("GET")
+    request.addHeader("Accept", "application/json")
+    request.retainBodyOnError(true)
+
+    if Left(LCase(url), 5) = "https"
+        request.setCertificatesFile("common:/certs/ca-bundle.crt")
+        request.initClientCertificates()
+    end if
+
+    if not request.asyncGetToString()
+        m.top.result = { ok: false, error: "Could not start request" }
+        return
+    end if
+
+    event = wait(REQUEST_TIMEOUT_MS, port)
+    if event = invalid
+        request.asyncCancel()
+        m.top.result = { ok: false, error: "Timed out reaching the fantasy service" }
+        return
+    end if
+
+    if type(event) <> "roUrlEvent"
+        m.top.result = { ok: false, error: "Unexpected response type" }
+        return
+    end if
+
+    code = event.getResponseCode()
+    body = event.getString()
+    parsed = invalid
+    if body <> invalid and body <> "" then parsed = ParseJson(body)
+
+    if code <> 200
+        message = "Fantasy service returned HTTP " + code.toStr()
+        ' The proxy sends a human-readable reason on failure; surface it
+        if parsed <> invalid and type(parsed) = "roAssociativeArray" and parsed.error <> invalid
+            message = parsed.error
+        end if
+        m.top.result = { ok: false, error: message }
+        return
+    end if
+
+    if parsed = invalid
+        m.top.result = { ok: false, error: "Fantasy service sent unreadable data" }
+        return
+    end if
+
+    m.top.result = { ok: true, data: parsed }
+end sub

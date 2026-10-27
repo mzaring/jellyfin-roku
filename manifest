@@ -32,3 +32,9 @@ bs_const=printReg=false
 supports_voice_roinput=1
 supports_etc_seek=1
 supports_etc_next=1
+
+# Fantasy matchup overlay (fork)
+# Point this at the machine running fantasy-proxy (see fantasy-proxy/README.md).
+# Use that machine's LAN IP, not "localhost".
+fantasy_endpoint=http://192.168.1.50:8765/matchup
+fantasy_poll_seconds=30

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="FantasyOverlay" extends="Group">
+  <children>
+    <Rectangle id="card" width="480" height="124" color="0x000000D0">
+      <Label id="weekLabel" translation="[16,6]" width="448" height="30" vertAlign="center" font="font:SmallSystemFont" color="0xAAAAAAFF" />
+
+      <Label id="myName" translation="[16,40]" width="180" height="34" vertAlign="center" font="font:SmallBoldSystemFont" color="0xFFFFFFFF" />
+      <Label id="myProj" translation="[196,40]" width="120" height="34" vertAlign="center" horizAlign="right" font="font:SmallSystemFont" color="0xAAAAAAFF" />
+      <Label id="myScore" translation="[320,40]" width="144" height="34" vertAlign="center" horizAlign="right" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+
+      <Label id="oppName" translation="[16,80]" width="180" height="34" vertAlign="center" font="font:SmallBoldSystemFont" color="0xFFFFFFFF" />
+      <Label id="oppProj" translation="[196,80]" width="120" height="34" vertAlign="center" horizAlign="right" font="font:SmallSystemFont" color="0xAAAAAAFF" />
+      <Label id="oppScore" translation="[320,80]" width="144" height="34" vertAlign="center" horizAlign="right" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+    </Rectangle>
+
+    <!-- Polls only while the overlay is visible; duration comes from the manifest -->
+    <Timer id="pollTimer" repeat="true" duration="30" />
+  </children>
+</component>

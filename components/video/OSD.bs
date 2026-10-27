@@ -515,6 +515,12 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
+    ' The * (options) button toggles the fantasy overlay without dismissing the OSD
+    if key = "options"
+        m.top.action = "togglefantasy"
+        return true
+    end if
+
     if not m.progressBarGroup.hasfocus()
         if key = "OK"
             onButtonSelected()

@@ -85,6 +85,7 @@ sub init()
     m.osd.isRecording = false
     m.osd.recordingOffset = 0
     m.castPopup = m.top.findNode("castPopup")
+    m.fantasyOverlay = m.top.findNode("fantasyOverlay")
     m.clock = m.osd.findNode("clock")
     if isValid(m.clock)
         m.clockTimer = m.clock.findNode("currentTimeTimer")
@@ -514,6 +515,13 @@ sub handleShowCastCrewPopupAction()
     m.castPopup.callFunc("showCast", m.castPeople)
 end sub
 
+' toggleFantasyOverlay: Show or hide the fantasy matchup overlay.
+' The overlay starts and stops its own polling when its visibility changes.
+'
+sub toggleFantasyOverlay()
+    m.fantasyOverlay.visible = not m.fantasyOverlay.visible
+end sub
+
 ' onOSDAction: Process action events from OSD to their respective handlers
 '
 sub onOSDAction()
@@ -521,6 +529,11 @@ sub onOSDAction()
 
     if action = "favoritechannel"
         toggleFavoriteChannel()
+        return
+    end if
+
+    if action = "togglefantasy"
+        toggleFantasyOverlay()
         return
     end if
 
@@ -2119,6 +2132,13 @@ function onKeyEvent(key as string, press as boolean) as boolean
         ' Look for the key release event.  If it's the left or right key then reset the ten second skip timers
         if key = KeyCode.Left or key = KeyCode.RIGHT then resetTenSecondSkipTimers()
         return false
+    end if
+
+    ' The * (options) button toggles the fantasy matchup overlay.  When the OSD is open it handles
+    ' this key itself and reports it through the "togglefantasy" action.
+    if isStringEqual(key, KeyCode.OPTIONS)
+        toggleFantasyOverlay()
+        return true
     end if
 
     ' Handle press and navigation from the skip segment button.  If the OSD is visible then the skip segment button acts as part of the OSD navigation.

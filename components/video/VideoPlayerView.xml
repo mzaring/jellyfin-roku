@@ -70,6 +70,9 @@
       </LayoutGroup>
     </Rectangle>
 
+    <!-- Fantasy matchup overlay, toggled with the remote's * (options) button -->
+    <FantasyOverlay id="fantasyOverlay" visible="false" translation="[1337,120]" />
+
     <StandardButton id="skipSegment" visible="false" height="85" width="275" translation="[1500, 950]" />
 
     <Rectangle id="subtitleTimingButtons" height="120" width="560" translation="[100, 900]" visible="false">

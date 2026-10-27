@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="FantasyTask" extends="Task">
+  <interface>
+    <!-- Full URL of the fantasy proxy's /matchup endpoint -->
+    <field id="url" type="string" />
+    <!-- { ok: true, data: <parsed JSON> } or { ok: false, error: "<message>" } -->
+    <field id="result" type="assocarray" alwaysNotify="true" />
+  </interface>
+</component>
