@@ -261,8 +261,8 @@ function normalCdf(z) {
   return 0.5 * (1 + (z >= 0 ? erf : -erf));
 }
 
-// Estimated chance (whole percent, 1-99) that side A wins.  This is the proxy's own estimate, not
-// ESPN's number: each team's expected final is what it has scored plus its projection scaled by how
+// Estimated chance (whole percent, 1-99) that side A wins.  This is the proxy's own estimate, used
+// only when ESPN supplies no win probability: each team's expected final is what it has scored plus its projection scaled by how
 // much of the week is left (guessed from points scored vs. projected), and the spread shrinks as the
 // week is played.  Returns [a, b] summing to 100.
 const WIN_SPREAD = 50;
@@ -274,6 +274,36 @@ function winPercents(aScore, aProj, bScore, bProj) {
   const spread = WIN_SPREAD * Math.sqrt(Math.max(left, 0.02));
   const a = Math.min(99, Math.max(1, Math.round(normalCdf(diff / spread) * 100)));
   return [a, 100 - a];
+}
+
+// ESPN's own win probability, if the response carries one.  I have not seen a real response, so this
+// accepts a "winProbability" number on either team's side of the matchup (0-1 or 0-100), or one on the
+// matchup itself, which is taken to be the home team's.  Returns [me, opp] summing to 100, or null.
+function findWinKey(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const key = Object.keys(obj).find((k) => /^win.?prob/i.test(k));
+  const value = key === undefined ? null : Number(obj[key]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function toPercent(value) {
+  const pct = value >= 0 && value <= 1 ? value * 100 : value;
+  return Math.min(99, Math.max(1, Math.round(pct)));
+}
+
+function espnWinPercents(entry, mySide, oppSide) {
+  const mine = findWinKey(mySide);
+  if (mine !== null) return [toPercent(mine), 100 - toPercent(mine)];
+
+  const theirs = findWinKey(oppSide);
+  if (theirs !== null) return [100 - toPercent(theirs), toPercent(theirs)];
+
+  const home = findWinKey(entry);
+  if (home !== null) {
+    const homePct = toPercent(home);
+    return mySide === entry.home ? [homePct, 100 - homePct] : [100 - homePct, homePct];
+  }
+  return null;
 }
 
 // raw: ESPN league JSON. Returns the exact shape the Roku overlay renders.
@@ -313,12 +343,9 @@ function buildMatchup(raw, opts) {
 
   const myPoints = pointsOf(mySide) ?? 0;
   const oppPoints = pointsOf(oppSide) ?? 0;
-  const [myWin, oppWin] = winPercents(
-    myPoints,
-    parseFloat(me.proj) || 0,
-    oppPoints,
-    parseFloat(opp.proj) || 0,
-  );
+  const [myWin, oppWin] =
+    espnWinPercents(entry, mySide, oppSide) ||
+    winPercents(myPoints, parseFloat(me.proj) || 0, oppPoints, parseFloat(opp.proj) || 0);
   me.win = myWin;
   opp.win = oppWin;
 
@@ -402,4 +429,5 @@ module.exports = {
   sampleRaw,
   findMyTeamId,
   winPercents,
+  espnWinPercents,
 };

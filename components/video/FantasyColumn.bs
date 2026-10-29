@@ -6,9 +6,9 @@ const COLOR_DIM = "0x777777FF" ' nothing scored yet
 const COLOR_LEADING = "0x5CE07AFF" ' team in front, and players beating their projection
 const COLOR_NEGATIVE = "0xFF7A7AFF"
 
-' Layout.  One team's half is 308 wide.  If you change COLUMN_WIDTH, change the card size in
+' Layout.  One team's half is 250 wide.  If you change COLUMN_WIDTH, change the card size in
 ' FantasyOverlay.bs and the positions in FantasyOverlay.xml to match.
-const COLUMN_WIDTH = 308
+const COLUMN_WIDTH = 250
 const LOGO_SIZE = 60
 const LOGO_GAP = 8
 const NAME_TOP = 78
@@ -20,9 +20,9 @@ const ROW_HEIGHT = 48
 const PTS_HEIGHT = 26
 const PROJ_HEIGHT = 20
 
-' Row cells: name 158 wide, then a 150-wide stack with points above projected.
-const NAME_WIDTH = 158
-const NUM_WIDTH = 150
+' Row cells: name 164 wide, then an 86-wide stack with points above projected.
+const NAME_WIDTH = 164
+const NUM_WIDTH = 86
 
 ' One team's half of the fantasy overlay: logo, totals, name, win bar and one row per starter.
 ' The right-hand team is mirrored so both teams' points sit beside the shared slot column.
@@ -36,7 +36,7 @@ sub init()
     m.winFill = m.top.findNode("winFill")
     m.rowsGroup = m.top.findNode("rows")
 
-    setFont(m.teamName, "font:MediumBoldSystemFont", 26)
+    setFont(m.teamName, "font:MediumBoldSystemFont", 24)
     setFont(m.projTotal, "font:SmallSystemFont", 20)
     setFont(m.score, "font:LargeBoldSystemFont", 38)
     setFont(m.winText, "font:SmallSystemFont", 20)

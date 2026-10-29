@@ -7,9 +7,11 @@ const DEFAULT_POLL_SECONDS = 30
 const MIN_POLL_SECONDS = 10
 
 ' Card geometry.  These must agree with FantasyOverlay.xml and FantasyColumn.xml:
-' two 308-wide columns, a 64px slot strip between them and 14px of padding all round = 708.
-const CARD_WIDTH = 708
-const SLOT_WIDTH = 64
+' two 250-wide columns, a 52px slot strip with an 8px dark gap each side, and 14px of padding = 596.
+const CARD_WIDTH = 596
+const COLUMN_WIDTH = 250
+const SLOT_GAP = 8
+const SLOT_WIDTH = 52
 const CARD_PADDING = 14
 const MESSAGE_WIDTH = 600
 const MESSAGE_HEIGHT = 36
@@ -141,7 +143,7 @@ sub showFullLayout(rowCount as integer)
     m.card.height = COLUMNS_TOP + ROWS_TOP + rowCount * ROW_HEIGHT + BOTTOM_PADDING
     m.weekLabel.width = CARD_WIDTH - 2 * CARD_PADDING
 
-    m.slotStrip.translation = [CARD_PADDING + 308, COLUMNS_TOP + STRIP_TOP]
+    m.slotStrip.translation = [CARD_PADDING + COLUMN_WIDTH + SLOT_GAP, COLUMNS_TOP + STRIP_TOP]
     m.slotStrip.height = m.card.height - COLUMNS_TOP - STRIP_TOP - BOTTOM_PADDING
     m.slotStrip.visible = true
     m.slotsGroup.visible = true
@@ -175,7 +177,7 @@ end sub
 
 ' updateSlots: position labels (QB, RB, ...) are drawn once, in the strip between the lineups
 sub updateSlots(mine as dynamic, theirs as dynamic)
-    m.slotsGroup.translation = [CARD_PADDING + 308, COLUMNS_TOP + ROWS_TOP]
+    m.slotsGroup.translation = [CARD_PADDING + COLUMN_WIDTH + SLOT_GAP, COLUMNS_TOP + ROWS_TOP]
 
     count = 0
     if type(mine) = "roArray" then count = mine.count()
@@ -194,7 +196,7 @@ sub updateSlots(mine as dynamic, theirs as dynamic)
             label.horizAlign = "center"
             label.vertAlign = "center"
             label.font = "font:SmallBoldSystemFont"
-            label.font.size = 20
+            label.font.size = 18
             label.color = COLOR_MUTED
             m.slotsGroup.appendChild(label)
             m.slotLabels.push(label)

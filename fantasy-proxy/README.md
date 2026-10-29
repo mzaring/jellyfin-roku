@@ -16,7 +16,7 @@ Select the scoreboard button in Jellyfin's playback controls and a box score app
 
 - Only starters are listed (no bench or injured reserve), as first initial and last name.
 - Each player's points are colored: **dim gray** until they score, **white** once they're on the board, **green** once they match or beat their projection, and **red** below zero. A team's total is dim at 0.00 and green for whichever team is ahead.
-- The win-percentage bar is the proxy's own estimate, not ESPN's number: it compares each team's score plus the projection for the part of the week left, and tightens as the week is played. Expect it to differ a few points from the ESPN app.
+- The win-percentage bar uses ESPN's own `winProbability` when the response includes one, and falls back to the proxy's own estimate (scores plus the projection for what's left of the week) when it doesn't.
 - The card sits to the right of the row of buttons in the playback controls, so it never covers them.
 
 There are two pieces:

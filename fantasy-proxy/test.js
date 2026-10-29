@@ -396,3 +396,21 @@ test('matchup includes a win percentage for each side', () => {
   const m = buildMatchup(sampleRaw(), { teamId: 1 });
   assert.equal(m.me.win + m.opp.win, 100);
 });
+
+test('uses ESPN win probability when present, as a fraction or a percent', () => {
+  const { espnWinPercents } = require('./espn');
+  const home = { teamId: 1, winProbability: 0.67 };
+  const away = { teamId: 2 };
+  const entry = { home, away };
+  assert.deepEqual(espnWinPercents(entry, home, away), [67, 33]);
+  assert.deepEqual(espnWinPercents(entry, away, home), [33, 67]);
+  assert.deepEqual(espnWinPercents({ home: { winProbability: 33 }, away: {} }, {}, { winProbability: 67 }), [33, 67]);
+  assert.equal(espnWinPercents({ home: {}, away: {} }, {}, {}), null);
+
+  const raw = league({
+    schedule: [{ matchupPeriodId: 8, winProbability: 0.8, home: { teamId: 1, totalPoints: 10 }, away: { teamId: 2, totalPoints: 90 } }],
+  });
+  const m = buildMatchup(raw, { teamId: 1 });
+  assert.equal(m.me.win, 80);
+  assert.equal(m.opp.win, 20);
+});
