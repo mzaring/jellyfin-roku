@@ -16,10 +16,10 @@ const CARD_PADDING = 14
 const MESSAGE_WIDTH = 600
 const MESSAGE_HEIGHT = 36
 const COLUMNS_TOP = 36
-const ROWS_TOP = 178
+const ROWS_TOP = 186
 const ROW_HEIGHT = 48
 const BOTTOM_PADDING = 14
-const STRIP_TOP = 172
+const STRIP_TOP = 180
 
 ' Fantasy matchup overlay: both teams side by side, like ESPN's box score.
 '

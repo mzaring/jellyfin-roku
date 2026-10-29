@@ -12,10 +12,10 @@ const COLUMN_WIDTH = 240
 const LOGO_SIZE = 60
 const LOGO_GAP = 8
 const NAME_TOP = 78
-const WIN_TOP = 138
+const WIN_TOP = 146
 const WIN_LABEL_WIDTH = 54
 const WIN_BAR_HEIGHT = 8
-const ROWS_TOP = 178
+const ROWS_TOP = 186
 const ROW_HEIGHT = 48
 const PTS_HEIGHT = 26
 const PROJ_HEIGHT = 20
@@ -38,7 +38,7 @@ sub init()
     m.winFill = m.top.findNode("winFill")
     m.rowsGroup = m.top.findNode("rows")
 
-    setFont(m.teamName, "font:MediumBoldSystemFont", 24)
+    setFont(m.teamName, "font:MediumBoldSystemFont", 22)
     setFont(m.projTotal, "font:SmallSystemFont", 20)
     setFont(m.score, "font:LargeBoldSystemFont", 38)
     setFont(m.winText, "font:SmallSystemFont", 20)

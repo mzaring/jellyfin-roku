@@ -13,7 +13,7 @@
     <Poster id="logo" width="60" height="60" loadDisplayMode="scaleToFit" />
     <Label id="score" height="38" vertAlign="center" color="0xFFFFFFFF" />
     <Label id="projTotal" height="22" vertAlign="center" color="0xAAAAAAFF" />
-    <Label id="teamName" height="56" vertAlign="top" wrap="true" numLines="2" color="0xFFFFFFFF" />
+    <Label id="teamName" height="66" vertAlign="top" wrap="true" numLines="2" color="0xFFFFFFFF" />
 
     <!-- Projected win percentage bar -->
     <Label id="winText" height="24" vertAlign="center" color="0xFFFFFFFF" />
