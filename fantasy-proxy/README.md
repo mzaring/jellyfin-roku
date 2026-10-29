@@ -1,6 +1,6 @@
 # Fantasy matchup overlay for Jellyfin Roku
 
-Press **\*** on your Roku remote while watching and a small scoreboard appears over the video with your ESPN fantasy football matchup. Press **\*** again to hide it.
+Select the scoreboard button in Jellyfin's playback controls and a small scoreboard appears over the video with your ESPN fantasy football matchup. Select it again to hide it.
 
 ```
 ┌──────────────────────────────────────┐
@@ -56,7 +56,7 @@ Your store copy of Jellyfin is a separate app and is not affected. The fork show
 
 ## Using it
 
-- **\*** (options button) toggles the overlay. It also works while the playback controls are open.
+- Press **Up** or **Down** during playback to open the controls, move to the row of small buttons at the top, select the **scoreboard (grid) button** at the far right, and press **OK**. Do it again to hide the overlay. (The remote's **\*** button is claimed by Roku's own menu on some devices, so it can't be relied on.)
 - The overlay only polls while visible. Turn it off and it makes no requests.
 - ESPN data is delayed by up to a minute or two during games. That's ESPN, not the overlay.
 - If the proxy or ESPN is unreachable, the overlay keeps showing the last scores, marked *out of date*.
