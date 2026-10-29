@@ -6,9 +6,9 @@ const COLOR_DIM = "0x777777FF" ' nothing scored yet
 const COLOR_LEADING = "0x5CE07AFF" ' team in front, and players beating their projection
 const COLOR_NEGATIVE = "0xFF7A7AFF"
 
-' Layout.  One team's half is 240 wide.  If you change COLUMN_WIDTH, change the card size in
+' Layout.  One team's half is 250 wide.  If you change COLUMN_WIDTH, change the card size in
 ' FantasyOverlay.bs and the positions in FantasyOverlay.xml to match.
-const COLUMN_WIDTH = 240
+const COLUMN_WIDTH = 250
 const LOGO_SIZE = 60
 const LOGO_GAP = 8
 const NAME_TOP = 78
@@ -17,11 +17,14 @@ const WIN_LABEL_WIDTH = 54
 const WIN_BAR_HEIGHT = 8
 const ROWS_TOP = 186
 const ROW_HEIGHT = 48
+const ROW_GAP = 2
+const COLOR_ROW_BG = "0xFFFFFF1F"
 const PTS_HEIGHT = 26
 const PROJ_HEIGHT = 20
 
 ' Row cells: name cell 168 wide (logo + name), then a 72-wide stack with points above projected.
-const NAME_WIDTH = 168
+const NAME_WIDTH = 166
+const ROW_PAD = 6
 const ROW_LOGO = 28
 const ROW_LOGO_GAP = 6
 const NUM_WIDTH = 72
@@ -210,12 +213,19 @@ function getRow(index as integer) as object
     projLabel = makeLabel("font:SmallSystemFont", 18, COLOR_MUTED, PROJ_HEIGHT)
     ptsLabel = makeLabel("font:SmallBoldSystemFont", 24, COLOR_NEUTRAL, PTS_HEIGHT)
 
+    background = createObject("roSGNode", "Rectangle")
+    background.translation = [0, Int(ROW_GAP / 2)]
+    background.width = COLUMN_WIDTH
+    background.height = ROW_HEIGHT - ROW_GAP
+    background.color = COLOR_ROW_BG
+
     logo = createObject("roSGNode", "Poster")
     logo.width = ROW_LOGO
     logo.height = ROW_LOGO
     logo.loadDisplayMode = "scaleToFit"
     logo.visible = false
 
+    group.appendChild(background)
     group.appendChild(logo)
     group.appendChild(nameLabel)
     group.appendChild(projLabel)
@@ -241,18 +251,18 @@ end sub
 ' layoutRow: name beside a stack of points over projected; mirrored for the right-hand team
 sub layoutRow(row as object)
     top = Int((ROW_HEIGHT - PTS_HEIGHT - PROJ_HEIGHT) / 2)
+    logoTop = Int((ROW_HEIGHT - ROW_LOGO) / 2)
+    nameWidth = NAME_WIDTH - ROW_LOGO - ROW_LOGO_GAP
     if m.mirror
-        place(row.pts, 0, top, NUM_WIDTH, "left")
-        place(row.proj, 0, top + PTS_HEIGHT, NUM_WIDTH, "left")
-        nameWidth = NAME_WIDTH - ROW_LOGO - ROW_LOGO_GAP
-        place(row.name, NUM_WIDTH, 0, nameWidth, "right")
-        row.logo.translation = [COLUMN_WIDTH - ROW_LOGO, Int((ROW_HEIGHT - ROW_LOGO) / 2)]
+        place(row.pts, ROW_PAD, top, NUM_WIDTH, "left")
+        place(row.proj, ROW_PAD, top + PTS_HEIGHT, NUM_WIDTH, "left")
+        place(row.name, ROW_PAD + NUM_WIDTH, 0, nameWidth, "right")
+        row.logo.translation = [COLUMN_WIDTH - ROW_PAD - ROW_LOGO, logoTop]
     else
-        nameWidth = NAME_WIDTH - ROW_LOGO - ROW_LOGO_GAP
-        row.logo.translation = [0, Int((ROW_HEIGHT - ROW_LOGO) / 2)]
-        place(row.name, ROW_LOGO + ROW_LOGO_GAP, 0, nameWidth, "left")
-        place(row.pts, NAME_WIDTH, top, NUM_WIDTH, "right")
-        place(row.proj, NAME_WIDTH, top + PTS_HEIGHT, NUM_WIDTH, "right")
+        row.logo.translation = [ROW_PAD, logoTop]
+        place(row.name, ROW_PAD + ROW_LOGO + ROW_LOGO_GAP, 0, nameWidth, "left")
+        place(row.pts, ROW_PAD + NAME_WIDTH, top, NUM_WIDTH, "right")
+        place(row.proj, ROW_PAD + NAME_WIDTH, top + PTS_HEIGHT, NUM_WIDTH, "right")
     end if
 end sub
 
