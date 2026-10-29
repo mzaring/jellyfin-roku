@@ -21,9 +21,6 @@
       <Rectangle id="winFill" height="8" color="0x2EE05AFF" />
     </Rectangle>
 
-    <Label id="headProj" height="22" vertAlign="center" text="PROJ" color="0xAAAAAAFF" />
-    <Label id="headPts" height="22" vertAlign="center" text="PTS" color="0xAAAAAAFF" />
-
     <!-- Player rows are created in code, one per starter -->
     <Group id="rows" />
   </children>

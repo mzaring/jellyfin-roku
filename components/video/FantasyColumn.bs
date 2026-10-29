@@ -11,18 +11,18 @@ const COLOR_NEGATIVE = "0xFF7A7AFF"
 const COLUMN_WIDTH = 308
 const LOGO_SIZE = 60
 const LOGO_GAP = 8
-const NAME_TOP = 66
-const WIN_TOP = 126
+const NAME_TOP = 78
+const WIN_TOP = 138
 const WIN_LABEL_WIDTH = 54
 const WIN_BAR_HEIGHT = 8
-const HEAD_TOP = 154
 const ROWS_TOP = 178
-const ROW_HEIGHT = 32
+const ROW_HEIGHT = 48
+const PTS_HEIGHT = 26
+const PROJ_HEIGHT = 20
 
-' Row cells (width): name 158, projected 62, points 88.
+' Row cells: name 158 wide, then a 150-wide stack with points above projected.
 const NAME_WIDTH = 158
-const PROJ_WIDTH = 62
-const PTS_WIDTH = 88
+const NUM_WIDTH = 150
 
 ' One team's half of the fantasy overlay: logo, totals, name, win bar and one row per starter.
 ' The right-hand team is mirrored so both teams' points sit beside the shared slot column.
@@ -34,16 +34,12 @@ sub init()
     m.winText = m.top.findNode("winText")
     m.winTrack = m.top.findNode("winTrack")
     m.winFill = m.top.findNode("winFill")
-    m.headProj = m.top.findNode("headProj")
-    m.headPts = m.top.findNode("headPts")
     m.rowsGroup = m.top.findNode("rows")
 
     setFont(m.teamName, "font:MediumBoldSystemFont", 26)
     setFont(m.projTotal, "font:SmallSystemFont", 20)
     setFont(m.score, "font:LargeBoldSystemFont", 38)
     setFont(m.winText, "font:SmallSystemFont", 20)
-    setFont(m.headProj, "font:SmallestSystemFont", 16)
-    setFont(m.headPts, "font:SmallestSystemFont", 16)
 
     m.rows = []
     m.logoFailed = false
@@ -80,14 +76,6 @@ sub applyLayout()
     place(m.winText, mirror ? COLUMN_WIDTH - WIN_LABEL_WIDTH : 0, WIN_TOP - 8, WIN_LABEL_WIDTH, align)
     m.winTrack.width = COLUMN_WIDTH - WIN_LABEL_WIDTH - 6
     m.winTrack.translation = [mirror ? 0 : WIN_LABEL_WIDTH + 6, WIN_TOP]
-
-    if mirror
-        place(m.headPts, 0, HEAD_TOP, PTS_WIDTH, "left")
-        place(m.headProj, PTS_WIDTH, HEAD_TOP, PROJ_WIDTH, "left")
-    else
-        place(m.headProj, NAME_WIDTH, HEAD_TOP, PROJ_WIDTH, "right")
-        place(m.headPts, NAME_WIDTH + PROJ_WIDTH, HEAD_TOP, PTS_WIDTH, "right")
-    end if
 
     m.rowsGroup.translation = [0, ROWS_TOP]
 end sub
@@ -182,7 +170,9 @@ sub updateRows(players as dynamic)
         row.group.visible = true
         row.name.text = toText(player.name)
         row.proj.text = toText(player.proj)
-        row.pts.text = toText(player.pts)
+        ptsText = toText(player.pts)
+        if toText(player.state) = "zero" or ptsText = "" then ptsText = "-"
+        row.pts.text = ptsText
         row.pts.color = pointsColor(toText(player.state))
     end for
 
@@ -207,9 +197,9 @@ function getRow(index as integer) as object
     group = createObject("roSGNode", "Group")
     group.translation = [0, index * ROW_HEIGHT]
 
-    nameLabel = makeLabel("font:SmallSystemFont", 24, COLOR_NEUTRAL)
-    projLabel = makeLabel("font:SmallSystemFont", 20, COLOR_MUTED)
-    ptsLabel = makeLabel("font:SmallBoldSystemFont", 24, COLOR_NEUTRAL)
+    nameLabel = makeLabel("font:SmallSystemFont", 24, COLOR_NEUTRAL, ROW_HEIGHT)
+    projLabel = makeLabel("font:SmallSystemFont", 18, COLOR_MUTED, PROJ_HEIGHT)
+    ptsLabel = makeLabel("font:SmallBoldSystemFont", 24, COLOR_NEUTRAL, PTS_HEIGHT)
 
     group.appendChild(nameLabel)
     group.appendChild(projLabel)
@@ -222,22 +212,23 @@ function getRow(index as integer) as object
     return row
 end function
 
-' layoutRow: name | projected | points, or points | projected | name when mirrored
+' layoutRow: name beside a stack of points over projected; mirrored for the right-hand team
 sub layoutRow(row as object)
+    top = Int((ROW_HEIGHT - PTS_HEIGHT - PROJ_HEIGHT) / 2)
     if m.mirror
-        place(row.pts, 0, 0, PTS_WIDTH, "left")
-        place(row.proj, PTS_WIDTH, 0, PROJ_WIDTH, "left")
-        place(row.name, PTS_WIDTH + PROJ_WIDTH, 0, NAME_WIDTH, "right")
+        place(row.pts, 0, top, NUM_WIDTH, "left")
+        place(row.proj, 0, top + PTS_HEIGHT, NUM_WIDTH, "left")
+        place(row.name, NUM_WIDTH, 0, NAME_WIDTH, "right")
     else
         place(row.name, 0, 0, NAME_WIDTH, "left")
-        place(row.proj, NAME_WIDTH, 0, PROJ_WIDTH, "right")
-        place(row.pts, NAME_WIDTH + PROJ_WIDTH, 0, PTS_WIDTH, "right")
+        place(row.pts, NAME_WIDTH, top, NUM_WIDTH, "right")
+        place(row.proj, NAME_WIDTH, top + PTS_HEIGHT, NUM_WIDTH, "right")
     end if
 end sub
 
-function makeLabel(fontUri as string, fontSize as integer, color as string) as object
+function makeLabel(fontUri as string, fontSize as integer, color as string, height as integer) as object
     label = createObject("roSGNode", "Label")
-    label.height = ROW_HEIGHT
+    label.height = height
     label.vertAlign = "center"
     setFont(label, fontUri, fontSize)
     label.color = color
