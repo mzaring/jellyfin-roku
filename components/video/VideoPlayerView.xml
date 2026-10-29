@@ -70,8 +70,9 @@
       </LayoutGroup>
     </Rectangle>
 
-    <!-- Fantasy matchup overlay, toggled with the remote's * (options) button -->
-    <FantasyOverlay id="fantasyOverlay" visible="false" translation="[1337,120]" />
+    <!-- Fantasy matchup overlay, toggled from the scoreboard button in the playback controls.
+         Placed below the OSD's row of option buttons so it never covers them. -->
+    <FantasyOverlay id="fantasyOverlay" visible="false" translation="[410,215]" />
 
     <StandardButton id="skipSegment" visible="false" height="85" width="275" translation="[1500, 950]" />
 

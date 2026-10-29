@@ -7,7 +7,7 @@
 //   GET /raw       raw ESPN response, only when ENABLE_RAW=1 (for debugging)
 
 const http = require('node:http');
-const { UserError, defaultSeason, fetchRaw, buildMatchup, sampleRaw } = require('./espn');
+const { UserError, defaultSeason, loadRaw, buildMatchup, sampleRaw } = require('./espn');
 
 const env = process.env;
 const cfg = {
@@ -38,7 +38,7 @@ let cache = { at: 0, body: null };
 let inflight = null;
 
 async function refresh() {
-  const raw = cfg.sample ? sampleRaw() : await fetchRaw(cfg);
+  const raw = cfg.sample ? sampleRaw() : await loadRaw(cfg);
   const body = buildMatchup(raw, cfg);
   cache = { at: Date.now(), body };
   return body;
@@ -78,7 +78,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/matchup') return send(res, 200, await getMatchup());
 
     if (path === '/raw' && cfg.enableRaw) {
-      return send(res, 200, cfg.sample ? sampleRaw() : await fetchRaw(cfg));
+      return send(res, 200, cfg.sample ? sampleRaw() : await loadRaw(cfg));
     }
 
     return send(res, 404, { ok: false, error: 'Not found' });

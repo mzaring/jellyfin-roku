@@ -1,0 +1,135 @@
+import "pkg:/source/enums/PosterLoadStatus.bs"
+
+const COLOR_LEADING = "0x5CE07AFF"
+const COLOR_NEUTRAL = "0xFFFFFFFF"
+const COLOR_MUTED = "0xAAAAAAFF"
+const ROW_HEIGHT = 38
+const COLUMN_WIDTH = 520
+const TEXT_LEFT_WITH_LOGO = 84
+const TEXT_LEFT_NO_LOGO = 0
+
+' One team's half of the fantasy overlay: logo, name, projected and actual totals, and one row
+' per starting player.  Data arrives all at once through the `side` field.
+sub init()
+    m.logo = m.top.findNode("logo")
+    m.teamName = m.top.findNode("teamName")
+    m.projTotal = m.top.findNode("projTotal")
+    m.score = m.top.findNode("score")
+    m.rowsGroup = m.top.findNode("rows")
+
+    m.rows = []
+    m.logoFailed = false
+
+    m.logo.observeField("loadStatus", "onLogoLoadStatusChanged")
+end sub
+
+sub onSideChanged()
+    side = m.top.side
+    if type(side) <> "roAssociativeArray" then return
+
+    m.teamName.text = toText(side.name)
+
+    projected = toText(side.proj)
+    m.projTotal.text = (projected <> "") ? "Proj " + projected : ""
+
+    m.score.text = toText(side.score)
+    m.score.color = (side.leading = true) ? COLOR_LEADING : COLOR_NEUTRAL
+
+    updateLogo(toText(side.logo))
+    updateRows(side.players)
+end sub
+
+sub updateLogo(uri as string)
+    if uri = ""
+        showLogo(false)
+        return
+    end if
+
+    ' A different address gets a fresh try; the same address that already failed stays hidden
+    if m.logo.uri <> uri
+        m.logoFailed = false
+        m.logo.uri = uri
+    end if
+
+    showLogo(not m.logoFailed)
+end sub
+
+sub onLogoLoadStatusChanged()
+    if m.logo.loadStatus = PosterLoadStatus.FAILED
+        m.logoFailed = true
+        showLogo(false)
+    end if
+end sub
+
+' showLogo: With no logo, slide the team name and projection left into the freed space
+sub showLogo(visible as boolean)
+    m.logo.visible = visible
+
+    left = visible ? TEXT_LEFT_WITH_LOGO : TEXT_LEFT_NO_LOGO
+    m.teamName.translation = [left, 0]
+    m.teamName.width = COLUMN_WIDTH - left
+    m.projTotal.translation = [left, 44]
+end sub
+
+sub updateRows(players as dynamic)
+    if type(players) <> "roArray" then players = []
+
+    count = players.count()
+    for i = 0 to count - 1
+        player = players[i]
+        row = getRow(i)
+
+        row.group.visible = true
+        row.slot.text = toText(player.slot)
+        row.name.text = toText(player.name)
+        row.proj.text = toText(player.proj)
+        row.pts.text = toText(player.pts)
+    end for
+
+    ' Hide rows left over from a longer lineup
+    for i = count to m.rows.count() - 1
+        m.rows[i].group.visible = false
+    end for
+end sub
+
+' getRow: Rows are created the first time they are needed, then reused on every refresh
+function getRow(index as integer) as object
+    if index < m.rows.count() then return m.rows[index]
+
+    group = createObject("roSGNode", "Group")
+    group.translation = [0, index * ROW_HEIGHT]
+
+    slotLabel = makeLabel(0, 64, "font:SmallestSystemFont", COLOR_MUTED, "left")
+    nameLabel = makeLabel(72, 254, "font:SmallSystemFont", COLOR_NEUTRAL, "left")
+    projLabel = makeLabel(330, 80, "font:SmallSystemFont", COLOR_MUTED, "right")
+    ptsLabel = makeLabel(420, 100, "font:SmallBoldSystemFont", COLOR_NEUTRAL, "right")
+
+    group.appendChild(slotLabel)
+    group.appendChild(nameLabel)
+    group.appendChild(projLabel)
+    group.appendChild(ptsLabel)
+    m.rowsGroup.appendChild(group)
+
+    row = { group: group, slot: slotLabel, name: nameLabel, proj: projLabel, pts: ptsLabel }
+    m.rows.push(row)
+    return row
+end function
+
+function makeLabel(left as integer, width as integer, fontName as string, color as string, align as string) as object
+    label = createObject("roSGNode", "Label")
+    label.translation = [left, 0]
+    label.width = width
+    label.height = ROW_HEIGHT
+    label.vertAlign = "center"
+    label.horizAlign = align
+    label.font = fontName
+    label.color = color
+    return label
+end function
+
+' toText: Label.text must be a string, so never hand it invalid or a number
+function toText(value as dynamic) as string
+    if value = invalid then return ""
+    if GetInterface(value, "ifString") <> invalid then return value
+    return ""
+end function

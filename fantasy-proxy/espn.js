@@ -9,9 +9,9 @@
 
 const API_BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons';
 
-// mTeam: team names/owners, mMatchupScore/mMatchup/mScoreboard: schedule + scores,
-// mLiveScoring: in-progress scoring. Extra views are harmless; ESPN merges them.
-const VIEWS = ['mTeam', 'mMatchupScore', 'mMatchup', 'mLiveScoring', 'mScoreboard'];
+// mTeam: team names/owners/logos. mMatchupScore, mMatchup, mScoreboard, mLiveScoring: schedule + scores.
+// mBoxscore: each side's lineup with per-player points. Extra views are harmless; ESPN merges them.
+const VIEWS = ['mTeam', 'mMatchupScore', 'mMatchup', 'mLiveScoring', 'mScoreboard', 'mBoxscore'];
 
 // An error whose message is safe and useful to show on the TV.
 class UserError extends Error {
@@ -27,23 +27,30 @@ function defaultSeason(now = new Date()) {
   return now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear();
 }
 
-function buildUrl({ leagueId, season }) {
+function buildUrl({ leagueId, season }, { scoringPeriodId } = {}) {
   const url = new URL(`${API_BASE}/${season}/segments/0/leagues/${leagueId}`);
   for (const view of VIEWS) url.searchParams.append('view', view);
+  if (scoringPeriodId) url.searchParams.set('scoringPeriodId', String(scoringPeriodId));
   return url;
 }
 
-async function fetchRaw(cfg) {
+// extra.scoringPeriodId / extra.matchupPeriodId: ask for one specific week, as ESPN's own site does.
+async function fetchRaw(cfg, extra = {}) {
   const headers = {
     Accept: 'application/json',
     'User-Agent': 'Mozilla/5.0 (compatible; jellyfin-roku-fantasy-proxy)',
   };
   // Public leagues need no cookies; private leagues need both.
   if (cfg.espnS2 && cfg.swid) headers.Cookie = `espn_s2=${cfg.espnS2}; SWID=${cfg.swid}`;
+  if (extra.matchupPeriodId) {
+    headers['x-fantasy-filter'] = JSON.stringify({
+      schedule: { filterMatchupPeriodIds: { value: [extra.matchupPeriodId] } },
+    });
+  }
 
   let res;
   try {
-    res = await fetch(buildUrl(cfg), { headers, signal: AbortSignal.timeout(10_000) });
+    res = await fetch(buildUrl(cfg, extra), { headers, signal: AbortSignal.timeout(10_000) });
   } catch (err) {
     throw new UserError('Could not reach ESPN');
   }
@@ -60,6 +67,40 @@ async function fetchRaw(cfg) {
     // ESPN sometimes answers a bad cookie with an HTML sign-in page and a 200
     throw new UserError('ESPN sent unreadable data (check cookies)');
   }
+}
+
+const isNumber = (value) => typeof value === 'number' && Number.isFinite(value);
+
+function currentPeriod(raw) {
+  return (raw && raw.status && raw.status.currentMatchupPeriod) || (raw && raw.scoringPeriodId) || null;
+}
+
+function rosterEntries(side) {
+  return (side && side.rosterForCurrentScoringPeriod && side.rosterForCurrentScoringPeriod.entries) || [];
+}
+
+function hasLineups(raw, period) {
+  const schedule = Array.isArray(raw && raw.schedule) ? raw.schedule : [];
+  return schedule.some(
+    (m) => m.matchupPeriodId === period && (rosterEntries(m.home).length > 0 || rosterEntries(m.away).length > 0),
+  );
+}
+
+// Loads ESPN data for the current week. The normal response usually includes each side's lineup;
+// if it doesn't, ask again with the week spelled out. Lineups are a nice-to-have, so if the second
+// request fails or still has none, keep the scores we already have.
+async function loadRaw(cfg, fetcher = fetchRaw) {
+  const raw = await fetcher(cfg);
+  const period = currentPeriod(raw);
+  if (!period || hasLineups(raw, period)) return raw;
+
+  try {
+    const detailed = await fetcher(cfg, { scoringPeriodId: period, matchupPeriodId: period });
+    if (hasLineups(detailed, period)) return { ...raw, schedule: detailed.schedule };
+  } catch (err) {
+    // fall through to the scores-only response
+  }
+  return raw;
 }
 
 const normalizeSwid = (value) => String(value || '').replace(/[{}]/g, '').toLowerCase();
@@ -91,8 +132,6 @@ function findMyTeamId(teams, { teamId, swid }) {
   return null;
 }
 
-const isNumber = (value) => typeof value === 'number' && Number.isFinite(value);
-
 // Prefer the live total while games are in progress, then the regular total.
 function pointsOf(side) {
   if (!side) return null;
@@ -108,13 +147,89 @@ function projectedOf(side) {
   return null;
 }
 
-function formatSide(side, team) {
-  const points = pointsOf(side);
-  const projected = projectedOf(side);
+// ESPN lineup slot ids -> the short labels shown in the overlay
+const SLOT_LABELS = {
+  0: 'QB', 1: 'TQB', 2: 'RB', 3: 'R/W', 4: 'WR', 5: 'W/T', 6: 'TE', 7: 'OP',
+  8: 'DT', 9: 'DE', 10: 'LB', 11: 'DL', 12: 'CB', 13: 'S', 14: 'DB', 15: 'DP',
+  16: 'D/ST', 17: 'K', 18: 'P', 19: 'HC', 23: 'FLEX',
+};
+const NON_STARTER_SLOTS = new Set([20, 21]); // bench, injured reserve
+// Display order, matching ESPN's own box score: QB, RB, WR, TE, FLEX, D/ST, K
+const SLOT_ORDER = [0, 2, 3, 4, 5, 6, 7, 23, 16, 17];
+
+const slotRank = (slotId) => {
+  const index = SLOT_ORDER.indexOf(slotId);
+  return index === -1 ? SLOT_ORDER.length + (isNumber(slotId) ? slotId : 99) : index;
+};
+
+// One stat line for a player in one week. statSourceId 0 = actual, 1 = projected.
+function playerStat(player, period, sourceId) {
+  const stats = Array.isArray(player.stats) ? player.stats : [];
+  const hit = stats.find((s) => s.scoringPeriodId === period && s.statSourceId === sourceId);
+  return hit && isNumber(hit.appliedTotal) ? hit.appliedTotal : null;
+}
+
+function playerName(player) {
+  const full =
+    player.fullName || `${player.firstName || ''} ${player.lastName || ''}`.trim() || 'Unknown';
+  // The slot column already says D/ST
+  return full.replace(/\s+D\/ST$/i, '');
+}
+
+// ESPN style: one decimal when that says it all (19.0, 16.7), two otherwise (22.12)
+function formatPlayerPoints(value) {
+  const two = value.toFixed(2);
+  return two.endsWith('0') ? value.toFixed(1) : two;
+}
+
+// Starting lineup for one side of the matchup, in display order
+function lineupOf(side, statPeriod) {
+  const starters = [];
+  for (const entry of rosterEntries(side)) {
+    const slotId = entry.lineupSlotId;
+    const pool = entry.playerPoolEntry;
+    const player = pool && pool.player;
+    if (!player || NON_STARTER_SLOTS.has(slotId)) continue;
+
+    let actual = pool.appliedStatTotal;
+    if (!isNumber(actual)) actual = playerStat(player, statPeriod, 0);
+
+    starters.push({
+      slotId,
+      name: playerName(player),
+      proj: playerStat(player, statPeriod, 1),
+      actual: isNumber(actual) ? actual : 0,
+    });
+  }
+  return starters.sort((a, b) => slotRank(a.slotId) - slotRank(b.slotId));
+}
+
+function logoOf(team) {
+  return team && typeof team.logo === 'string' && /^https?:\/\//i.test(team.logo) ? team.logo : '';
+}
+
+function formatSide(side, team, statPeriod) {
+  const starters = lineupOf(side, statPeriod);
+
+  // Projected total is the sum of the starters' projections, like ESPN's TOTALS row
+  let projected = null;
+  if (starters.length > 0) {
+    projected = starters.reduce((sum, p) => sum + (p.proj === null ? 0 : p.proj), 0);
+  } else {
+    projected = projectedOf(side);
+  }
+
   return {
     name: teamName(team),
-    score: (points ?? 0).toFixed(2),
-    proj: projected === null ? '' : `proj ${projected.toFixed(1)}`,
+    score: (pointsOf(side) ?? 0).toFixed(2),
+    proj: projected === null ? '' : projected.toFixed(1),
+    logo: logoOf(team),
+    players: starters.map((p) => ({
+      slot: SLOT_LABELS[p.slotId] || '',
+      name: p.name,
+      proj: p.proj === null ? '--' : p.proj.toFixed(1),
+      pts: formatPlayerPoints(p.actual),
+    })),
   };
 }
 
@@ -130,9 +245,10 @@ function buildMatchup(raw, opts) {
     throw new UserError('Could not tell which team is yours (set TEAM_ID)', 500);
   }
 
-  const period = (raw.status && raw.status.currentMatchupPeriod) || raw.scoringPeriodId;
+  const period = currentPeriod(raw);
   if (!period) throw new UserError('ESPN did not say which week it is');
   const label = `Week ${period}`;
+  const statPeriod = raw.scoringPeriodId || period;
 
   const schedule = Array.isArray(raw.schedule) ? raw.schedule : [];
   const entry = schedule.find(
@@ -149,8 +265,8 @@ function buildMatchup(raw, opts) {
     return { ok: true, label, bye: true, fetchedAt: new Date().toISOString() };
   }
 
-  const me = formatSide(mySide, byId.get(myId));
-  const opp = formatSide(oppSide, byId.get(oppSide.teamId));
+  const me = formatSide(mySide, byId.get(myId), statPeriod);
+  const opp = formatSide(oppSide, byId.get(oppSide.teamId), statPeriod);
 
   const myPoints = pointsOf(mySide) ?? 0;
   const oppPoints = pointsOf(oppSide) ?? 0;
@@ -159,10 +275,45 @@ function buildMatchup(raw, opts) {
   return { ok: true, label, lead, me, opp, fetchedAt: new Date().toISOString() };
 }
 
-// ESPN-shaped fake league so the overlay can be tried without credentials.
-// Scores drift upward over time so you can watch the overlay update.
+// ---- Sample data -----------------------------------------------------------------------------
+// ESPN-shaped fake league so the overlay can be tried without credentials. Points grow over a
+// four-hour loop so you can watch the overlay update.
+
+const SAMPLE_LINEUPS = {
+  1: [
+    [0, 'Casey Archer', 18.2], [2, 'Dana Brooks', 15.4], [2, 'Eli Carter', 13.9],
+    [4, 'Finn Dawson', 16.8], [4, 'Gus Ellison', 12.3], [6, 'Hal Foster', 9.6],
+    [23, 'Ira Gibbs', 11.1], [16, 'Harbor City D/ST', 7.5], [17, 'Jay Hollis', 8.9],
+    [20, 'Bench Player', 5.0],
+  ],
+  2: [
+    [0, 'Kit Landry', 20.1], [2, 'Lou Mercer', 14.2], [2, 'Max Norwood', 12.8],
+    [4, 'Ned Overton', 17.4], [4, 'Oz Prescott', 13.5], [6, 'Pat Quill', 8.7],
+    [23, 'Quinn Rowe', 10.3], [16, 'Lakeside D/ST', 6.8], [17, 'Reed Sutton', 9.2],
+    [20, 'Reserve Player', 4.0],
+  ],
+};
+
+function sampleSide(teamId, progress, factor, period) {
+  const entries = SAMPLE_LINEUPS[teamId].map(([lineupSlotId, fullName, proj]) => {
+    const benched = NON_STARTER_SLOTS.has(lineupSlotId);
+    const actual = benched ? 0 : Math.round(proj * (factor + 0.9 * progress) * 100) / 100;
+    return {
+      lineupSlotId,
+      playerPoolEntry: {
+        appliedStatTotal: actual,
+        player: { fullName, stats: [{ scoringPeriodId: period, statSourceId: 1, appliedTotal: proj }] },
+      },
+    };
+  });
+  const total = entries
+    .filter((e) => !NON_STARTER_SLOTS.has(e.lineupSlotId))
+    .reduce((sum, e) => sum + e.playerPoolEntry.appliedStatTotal, 0);
+  return { teamId, totalPoints: Math.round(total * 100) / 100, rosterForCurrentScoringPeriod: { entries } };
+}
+
 function sampleRaw(now = Date.now()) {
-  const minutes = Math.floor(now / 60_000) % 240;
+  const progress = (Math.floor(now / 60_000) % 240) / 240;
   return {
     scoringPeriodId: 8,
     status: { currentMatchupPeriod: 8 },
@@ -173,11 +324,20 @@ function sampleRaw(now = Date.now()) {
     schedule: [
       {
         matchupPeriodId: 8,
-        home: { teamId: 1, totalPoints: 61.4 + minutes * 0.35, totalProjectedPointsLive: 118.6 },
-        away: { teamId: 2, totalPoints: 58.9 + minutes * 0.3, totalProjectedPointsLive: 109.2 },
+        home: sampleSide(1, progress, 0.4, 8),
+        away: sampleSide(2, progress, 0.35, 8),
       },
     ],
   };
 }
 
-module.exports = { UserError, defaultSeason, fetchRaw, buildUrl, buildMatchup, sampleRaw, findMyTeamId };
+module.exports = {
+  UserError,
+  defaultSeason,
+  fetchRaw,
+  loadRaw,
+  buildUrl,
+  buildMatchup,
+  sampleRaw,
+  findMyTeamId,
+};

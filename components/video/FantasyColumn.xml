@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="FantasyColumn" extends="Group">
+  <interface>
+    <!-- One team's data from the fantasy proxy:
+         { name, score, proj, logo, leading (boolean), players: [{ slot, name, proj, pts }] } -->
+    <field id="side" type="assocarray" alwaysNotify="true" onChange="onSideChanged" />
+  </interface>
+
+  <children>
+    <!-- Team header: logo, name, projected total, actual total -->
+    <Poster id="logo" translation="[0,0]" width="72" height="72" loadDisplayMode="scaleToFit" />
+    <Label id="teamName" translation="[84,0]" width="436" height="38" vertAlign="center" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+    <Label id="projTotal" translation="[84,44]" width="180" height="30" vertAlign="center" font="font:SmallSystemFont" color="0xAAAAAAFF" />
+    <Label id="score" translation="[270,34]" width="250" height="46" vertAlign="center" horizAlign="right" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+
+    <Rectangle translation="[0,90]" width="520" height="2" color="0xFFFFFF33" />
+
+    <!-- Column headings -->
+    <Label translation="[72,98]" width="200" height="28" vertAlign="center" text="PLAYER" font="font:SmallestSystemFont" color="0xAAAAAAFF" />
+    <Label translation="[330,98]" width="80" height="28" vertAlign="center" horizAlign="right" text="PROJ" font="font:SmallestSystemFont" color="0xAAAAAAFF" />
+    <Label translation="[420,98]" width="100" height="28" vertAlign="center" horizAlign="right" text="PTS" font="font:SmallestSystemFont" color="0xAAAAAAFF" />
+
+    <!-- Player rows are created in code, one per starter -->
+    <Group id="rows" translation="[0,128]" />
+  </children>
+</component>

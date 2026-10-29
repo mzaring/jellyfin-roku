@@ -1,14 +1,21 @@
 # Fantasy matchup overlay for Jellyfin Roku
 
-Select the scoreboard button in Jellyfin's playback controls and a small scoreboard appears over the video with your ESPN fantasy football matchup. Select it again to hide it.
+Select the scoreboard button in Jellyfin's playback controls and a box score appears over the video with your ESPN fantasy football matchup: both teams side by side, each with its logo, projected and actual totals, and every starter's projected and actual points. Select the button again to hide it.
 
 ```
-┌──────────────────────────────────────┐
-│ Week 8                               │
-│ Sample Squad       proj 118.6  96.40 │  ← leader's score is green
-│ Gridiron Ghosts    proj 109.2  88.90 │
-└──────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                            Week 8                             │
+│ (logo) Sample Squad            │ (logo) Gridiron Ghosts       │
+│        Proj 113.7     85.98    │        Proj 113.0     79.80  │  ← leader's score is green
+│ ────────────────────────────── │ ──────────────────────────── │
+│        PLAYER      PROJ   PTS  │        PLAYER      PROJ  PTS │
+│ QB     Casey Archer 18.2 13.76 │ QB     Kit Landry  20.1 14.2 │
+│ RB     Dana Brooks  15.4 11.65 │ RB     Lou Mercer  14.2 10.03│
+│ ...                            │ ...                          │
+└───────────────────────────────────────────────────────────────┘
 ```
+
+Only starters are listed (no bench or injured reserve). The card sits below the row of buttons in the playback controls, so it never covers them.
 
 There are two pieces:
 
@@ -70,8 +77,10 @@ Your store copy of Jellyfin is a separate app and is not affected. The fork show
 | *ESPN login rejected* | Stale or wrong `ESPN_S2` / `SWID`. |
 | *Could not tell which team is yours* | Set `TEAM_ID` in `.env` (your team's number is in the URL when you open your team: `teamId=`). |
 | *Week N - no matchup* | A bye week, or ESPN has no matchup scheduled for you yet. |
-| Scores look wrong or projections are blank | ESPN's API is unofficial. Set `ENABLE_RAW=1`, restart, open `/raw`, and compare with `espn.js`. Projections only show when ESPN includes live projections for your league. |
+| Scores look wrong or projections are blank | ESPN's API is unofficial. Set `ENABLE_RAW=1`, restart, open `/raw`, and compare with `espn.js`. |
+| Totals show but the player lists are empty | ESPN didn't include lineups in its response. Open `/raw` (needs `ENABLE_RAW=1`) and look for `rosterForCurrentScoringPeriod` under `schedule`. |
+| Team names show but no logos | The logo address from ESPN is missing or in a format the Roku can't draw (for example SVG). Open `/raw` and look at `teams[].logo`. Without a logo the name simply moves left. |
 
 ## Not yet verified
 
-The ESPN request format and the proxy's parsing logic are covered by tests, but the tests use data shaped the way I expect ESPN to respond, not a captured response from a real league. The Roku code has been checked for structure but not compiled or run on a device. If either misbehaves on first run, `/raw` output and the Roku debug console (`telnet <roku-ip> 8085`) will show what's happening.
+The ESPN request format and the proxy's parsing logic are covered by tests, but the tests use data shaped the way I expect ESPN to respond, not a captured response from a real league. That applies most to the per-player lineups and the team logos. The Roku code has been checked for structure but not compiled or run on a device. If either misbehaves on first run, `/raw` output and the Roku debug console (`telnet <roku-ip> 8085`) will show what's happening.

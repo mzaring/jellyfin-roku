@@ -2,7 +2,15 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildMatchup, sampleRaw, findMyTeamId, buildUrl, defaultSeason, UserError } = require('./espn');
+const {
+  buildMatchup,
+  sampleRaw,
+  findMyTeamId,
+  buildUrl,
+  defaultSeason,
+  loadRaw,
+  UserError,
+} = require('./espn');
 
 const league = (overrides = {}) => ({
   scoringPeriodId: 8,
@@ -22,13 +30,36 @@ const league = (overrides = {}) => ({
   ...overrides,
 });
 
+// One roster entry in the shape ESPN uses
+const entry = (lineupSlotId, fullName, { proj, actual, period = 8 } = {}) => ({
+  lineupSlotId,
+  playerPoolEntry: {
+    ...(actual === undefined ? {} : { appliedStatTotal: actual }),
+    player: {
+      fullName,
+      stats: proj === undefined ? [] : [{ scoringPeriodId: period, statSourceId: 1, appliedTotal: proj }],
+    },
+  },
+});
+
+const withRosters = (homeEntries, awayEntries = []) =>
+  league({
+    schedule: [
+      {
+        matchupPeriodId: 8,
+        home: { teamId: 1, totalPoints: 10, rosterForCurrentScoringPeriod: { entries: homeEntries } },
+        away: { teamId: 2, totalPoints: 5, rosterForCurrentScoringPeriod: { entries: awayEntries } },
+      },
+    ],
+  });
+
 test('formats a matchup for display and marks the leader', () => {
   const out = buildMatchup(league(), { swid: '{AAAA-1111}' });
   assert.equal(out.ok, true);
   assert.equal(out.label, 'Week 8');
   assert.equal(out.lead, 'me');
-  assert.deepEqual(out.me, { name: 'Mine', score: '101.24', proj: '' });
-  assert.deepEqual(out.opp, { name: 'Their Team', score: '99.50', proj: '' });
+  assert.deepEqual(out.me, { name: 'Mine', score: '101.24', proj: '', logo: '', players: [] });
+  assert.deepEqual(out.opp, { name: 'Their Team', score: '99.50', proj: '', logo: '', players: [] });
 });
 
 test('works when my team is the away side', () => {
@@ -56,7 +87,7 @@ test('tie has no leader', () => {
   assert.equal(buildMatchup(raw, { teamId: 1 }).lead, 'tie');
 });
 
-test('prefers live totals and shows live projection when ESPN provides them', () => {
+test('prefers live totals and uses the live projection when there is no lineup', () => {
   const raw = league({
     schedule: [
       {
@@ -68,7 +99,7 @@ test('prefers live totals and shows live projection when ESPN provides them', ()
   });
   const out = buildMatchup(raw, { teamId: 1 });
   assert.equal(out.me.score, '42.50');
-  assert.equal(out.me.proj, 'proj 120.0');
+  assert.equal(out.me.proj, '120.0');
   assert.equal(out.opp.proj, '');
 });
 
@@ -122,11 +153,141 @@ test('garbage input is rejected cleanly', () => {
   assert.throws(() => buildMatchup('<html>', {}), UserError);
 });
 
-test('sample data runs through the same parser', () => {
-  const out = buildMatchup(sampleRaw(), { teamId: '1' });
-  assert.equal(out.me.name, 'Sample Squad');
-  assert.equal(out.opp.name, 'Gridiron Ghosts');
-  assert.match(out.me.score, /^\d+\.\d{2}$/);
+// ---- Lineups ---------------------------------------------------------------------------------
+
+test('lists starters only, in ESPN box score order, with slot labels', () => {
+  const raw = withRosters([
+    entry(17, 'Kicker Kyle', { proj: 8.8, actual: 14 }),
+    entry(20, 'Bench Ben', { proj: 5, actual: 0 }),
+    entry(23, 'Flex Fran', { proj: 3.1, actual: 5.8 }),
+    entry(4, 'Wide Walt', { proj: 10.2, actual: 10.9 }),
+    entry(0, 'Quarter Quinn', { proj: 17.6, actual: 22.12 }),
+    entry(16, 'Bears D/ST', { proj: 4.8, actual: 3 }),
+    entry(2, 'Run Rita', { proj: 16.3, actual: 19 }),
+    entry(21, 'Injured Ivy', { proj: 9, actual: 0 }),
+    entry(6, 'Tight Tom', { proj: 11.5, actual: 19.9 }),
+  ]);
+  const { players } = buildMatchup(raw, { teamId: 1 }).me;
+  assert.deepEqual(
+    players.map((p) => p.slot),
+    ['QB', 'RB', 'WR', 'TE', 'FLEX', 'D/ST', 'K'],
+  );
+  assert.ok(!players.some((p) => /Ben|Ivy/.test(p.name)), 'bench and IR are left out');
+});
+
+test('formats per-player points the way ESPN does', () => {
+  const raw = withRosters([
+    entry(0, 'A', { proj: 17.6, actual: 22.12 }),
+    entry(2, 'B', { proj: 16.25, actual: 19 }),
+    entry(4, 'C', { proj: 10, actual: 16.7 }),
+    entry(6, 'D', { proj: 0.04, actual: 0 }),
+  ]);
+  const { players } = buildMatchup(raw, { teamId: 1 }).me;
+  assert.deepEqual(
+    players.map((p) => [p.proj, p.pts]),
+    [['17.6', '22.12'], ['16.3', '19.0'], ['10.0', '16.7'], ['0.0', '0.0']],
+  );
+});
+
+test('strips the D/ST suffix because the slot column already says it', () => {
+  const raw = withRosters([entry(16, 'Bears D/ST', { proj: 4.8, actual: 3 })]);
+  const [dst] = buildMatchup(raw, { teamId: 1 }).me.players;
+  assert.equal(dst.name, 'Bears');
+  assert.equal(dst.slot, 'D/ST');
+});
+
+test('projected total is the sum of the starters, ignoring the bench', () => {
+  const raw = withRosters([
+    entry(0, 'A', { proj: 17.6, actual: 1 }),
+    entry(2, 'B', { proj: 16.3, actual: 1 }),
+    entry(20, 'Bench', { proj: 50, actual: 0 }),
+  ]);
+  assert.equal(buildMatchup(raw, { teamId: 1 }).me.proj, '33.9');
+});
+
+test('actual points come from the stat line when appliedStatTotal is absent', () => {
+  const raw = withRosters([
+    {
+      lineupSlotId: 0,
+      playerPoolEntry: {
+        player: {
+          fullName: 'Fallback Fred',
+          stats: [
+            { scoringPeriodId: 8, statSourceId: 0, appliedTotal: 12.5 },
+            { scoringPeriodId: 8, statSourceId: 1, appliedTotal: 15 },
+            { scoringPeriodId: 7, statSourceId: 0, appliedTotal: 99 },
+          ],
+        },
+      },
+    },
+  ]);
+  const [p] = buildMatchup(raw, { teamId: 1 }).me.players;
+  assert.deepEqual([p.proj, p.pts], ['15.0', '12.5']);
+});
+
+test('a player with no projection shows a dash and a missing score shows zero', () => {
+  const raw = withRosters([entry(0, 'No Proj')]);
+  const [p] = buildMatchup(raw, { teamId: 1 }).me.players;
+  assert.deepEqual([p.proj, p.pts], ['--', '0.0']);
+});
+
+test('empty slots and malformed entries are skipped', () => {
+  const raw = withRosters([{ lineupSlotId: 0 }, null, { lineupSlotId: 2, playerPoolEntry: {} }, entry(4, 'Real', { proj: 1, actual: 2 })].filter(Boolean));
+  assert.deepEqual(buildMatchup(raw, { teamId: 1 }).me.players.map((p) => p.name), ['Real']);
+});
+
+test('team logo is passed through only when it is a web address', () => {
+  const raw = league({
+    teams: [
+      { id: 1, name: 'Mine', logo: 'https://example.test/logo.png', owners: [] },
+      { id: 2, name: 'Theirs', logo: 'not-a-url', owners: [] },
+    ],
+  });
+  const out = buildMatchup(raw, { teamId: 1 });
+  assert.equal(out.me.logo, 'https://example.test/logo.png');
+  assert.equal(out.opp.logo, '');
+});
+
+// ---- Asking ESPN -----------------------------------------------------------------------------
+
+test('if the normal response has no lineups, asks again for the specific week and merges it', async () => {
+  const calls = [];
+  const lineup = [entry(0, 'Quarter Quinn', { proj: 10, actual: 12 })];
+  const fetcher = async (cfg, extra) => {
+    calls.push(extra);
+    return extra ? withRosters(lineup) : league();
+  };
+  const raw = await loadRaw({}, fetcher);
+  assert.deepEqual(calls, [undefined, { scoringPeriodId: 8, matchupPeriodId: 8 }]);
+  assert.equal(buildMatchup(raw, { teamId: 1 }).me.players.length, 1);
+  assert.equal(raw.teams.length, 3, 'keeps the team list from the first response');
+});
+
+test('does not ask twice when the first response already has lineups', async () => {
+  let calls = 0;
+  await loadRaw({}, async () => {
+    calls += 1;
+    return withRosters([entry(0, 'A', { proj: 1, actual: 1 })]);
+  });
+  assert.equal(calls, 1);
+});
+
+test('keeps the scores if the second request fails', async () => {
+  const fetcher = async (cfg, extra) => {
+    if (extra) throw new UserError('Could not reach ESPN');
+    return league();
+  };
+  const raw = await loadRaw({}, fetcher);
+  assert.equal(buildMatchup(raw, { teamId: 1 }).me.players.length, 0);
+});
+
+test('a failure on the first request still surfaces', async () => {
+  await assert.rejects(
+    loadRaw({}, async () => {
+      throw new UserError('ESPN login rejected (401)');
+    }),
+    /login rejected/,
+  );
 });
 
 test('request URL targets the right league and season with all views', () => {
@@ -134,10 +295,40 @@ test('request URL targets the right league and season with all views', () => {
   assert.equal(url.host, 'lm-api-reads.fantasy.espn.com');
   assert.equal(url.pathname, '/apis/v3/games/ffl/seasons/2026/segments/0/leagues/123');
   assert.ok(url.searchParams.getAll('view').includes('mMatchupScore'));
+  assert.ok(url.searchParams.getAll('view').includes('mBoxscore'));
+  assert.equal(url.searchParams.has('scoringPeriodId'), false);
+});
+
+test('request URL can name a specific week', () => {
+  const url = buildUrl({ leagueId: '123', season: 2026 }, { scoringPeriodId: 8 });
+  assert.equal(url.searchParams.get('scoringPeriodId'), '8');
 });
 
 test('season rolls over after the new year', () => {
   assert.equal(defaultSeason(new Date(2026, 9, 26)), 2026); // Oct
   assert.equal(defaultSeason(new Date(2027, 0, 15)), 2026); // Jan, still last season
   assert.equal(defaultSeason(new Date(2027, 2, 1)), 2027); // Mar
+});
+
+// ---- Sample data -----------------------------------------------------------------------------
+
+test('sample data runs through the same parser, with full lineups', () => {
+  const out = buildMatchup(sampleRaw(), { teamId: '1' });
+  assert.equal(out.me.name, 'Sample Squad');
+  assert.equal(out.opp.name, 'Gridiron Ghosts');
+  assert.match(out.me.score, /^\d+\.\d{2}$/);
+  assert.equal(out.me.players.length, 9);
+  assert.equal(out.opp.players.length, 9);
+  assert.deepEqual(
+    out.me.players.map((p) => p.slot),
+    ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'D/ST', 'K'],
+  );
+});
+
+test('sample team totals equal the sum of the listed players', () => {
+  for (const now of [0, 30 * 60_000, 150 * 60_000]) {
+    const out = buildMatchup(sampleRaw(now), { teamId: '1' });
+    const sum = out.me.players.reduce((total, p) => total + Number(p.pts), 0);
+    assert.ok(Math.abs(sum - Number(out.me.score)) < 0.2, `${sum} vs ${out.me.score}`);
+  }
 });
