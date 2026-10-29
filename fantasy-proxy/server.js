@@ -54,6 +54,7 @@ async function refresh() {
     if (side && side.logo) logoSources.set(side.teamId, side.logo);
   }
   cache = { at: Date.now(), body };
+  prefetchNflLogos(body);
   return body;
 }
 
@@ -106,6 +107,18 @@ async function getNflLogo(abbr) {
     }
   }
   return nflLogos.get(abbr);
+}
+
+// Download the NFL logos in the background as soon as we know which teams are playing, so the
+// overlay's first requests are served from memory instead of waiting on ESPN
+function prefetchNflLogos(body) {
+  const abbrs = new Set();
+  for (const side of [body.me, body.opp]) {
+    for (const p of (side && side.players) || []) if (p.team && NFL_ABBRS.has(p.team)) abbrs.add(p.team);
+  }
+  for (const abbr of abbrs) {
+    if (!nflLogos.has(abbr)) getNflLogo(abbr).catch(() => {});
+  }
 }
 
 async function getMatchup() {

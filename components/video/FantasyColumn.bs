@@ -132,9 +132,14 @@ sub updateLogo(uri as string)
         return
     end if
 
-    ' A different address gets a fresh try; the same address that already failed stays hidden
+    ' A different address gets a fresh try.  The same address that failed is retried on the next
+    ' refresh (a slow first download from the proxy shouldn't hide the logo for good).
     if m.logo.uri <> uri
         m.logoFailed = false
+        m.logo.uri = uri
+    else if m.logoFailed
+        m.logoFailed = false
+        m.logo.uri = ""
         m.logo.uri = uri
     end if
 
