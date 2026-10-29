@@ -1,12 +1,18 @@
 import "pkg:/source/enums/PosterLoadStatus.bs"
 
-const COLOR_LEADING = "0x5CE07AFF"
 const COLOR_NEUTRAL = "0xFFFFFFFF"
 const COLOR_MUTED = "0xAAAAAAFF"
-const ROW_HEIGHT = 38
-const COLUMN_WIDTH = 520
-const TEXT_LEFT_WITH_LOGO = 84
-const TEXT_LEFT_NO_LOGO = 0
+const COLOR_DIM = "0x777777FF" ' nothing scored yet
+const COLOR_LEADING = "0x5CE07AFF" ' team in front, and players beating their projection
+const COLOR_NEGATIVE = "0xFF7A7AFF"
+
+' Layout.  The column is 368 wide: slot | name | projected | points.
+' If you change a width here, change COLUMN_WIDTH in FantasyOverlay.bs and the
+' numbers in FantasyColumn.xml / FantasyOverlay.xml to match.
+const COLUMN_WIDTH = 368
+const ROW_HEIGHT = 32
+const NAME_LEFT_WITH_LOGO = 72
+const NAME_LEFT_NO_LOGO = 0
 
 ' One team's half of the fantasy overlay: logo, name, projected and actual totals, and one row
 ' per starting player.  Data arrives all at once through the `side` field.
@@ -16,6 +22,13 @@ sub init()
     m.projTotal = m.top.findNode("projTotal")
     m.score = m.top.findNode("score")
     m.rowsGroup = m.top.findNode("rows")
+
+    setFont(m.teamName, "font:MediumBoldSystemFont", 30)
+    setFont(m.projTotal, "font:SmallSystemFont", 22)
+    setFont(m.score, "font:LargeBoldSystemFont", 40)
+    setFont(m.top.findNode("headPlayer"), "font:SmallestSystemFont", 16)
+    setFont(m.top.findNode("headProj"), "font:SmallestSystemFont", 16)
+    setFont(m.top.findNode("headPts"), "font:SmallestSystemFont", 16)
 
     m.rows = []
     m.logoFailed = false
@@ -32,8 +45,15 @@ sub onSideChanged()
     projected = toText(side.proj)
     m.projTotal.text = (projected <> "") ? "Proj " + projected : ""
 
-    m.score.text = toText(side.score)
-    m.score.color = (side.leading = true) ? COLOR_LEADING : COLOR_NEUTRAL
+    scoreText = toText(side.score)
+    m.score.text = scoreText
+    if side.leading = true
+        m.score.color = COLOR_LEADING
+    else if Val(scoreText) = 0
+        m.score.color = COLOR_DIM
+    else
+        m.score.color = COLOR_NEUTRAL
+    end if
 
     updateLogo(toText(side.logo))
     updateRows(side.players)
@@ -61,14 +81,13 @@ sub onLogoLoadStatusChanged()
     end if
 end sub
 
-' showLogo: With no logo, slide the team name and projection left into the freed space
+' showLogo: With no logo, slide the team name left into the freed space
 sub showLogo(visible as boolean)
     m.logo.visible = visible
 
-    left = visible ? TEXT_LEFT_WITH_LOGO : TEXT_LEFT_NO_LOGO
+    left = visible ? NAME_LEFT_WITH_LOGO : NAME_LEFT_NO_LOGO
     m.teamName.translation = [left, 0]
     m.teamName.width = COLUMN_WIDTH - left
-    m.projTotal.translation = [left, 44]
 end sub
 
 sub updateRows(players as dynamic)
@@ -84,6 +103,7 @@ sub updateRows(players as dynamic)
         row.name.text = toText(player.name)
         row.proj.text = toText(player.proj)
         row.pts.text = toText(player.pts)
+        row.pts.color = pointsColor(toText(player.state))
     end for
 
     ' Hide rows left over from a longer lineup
@@ -92,6 +112,14 @@ sub updateRows(players as dynamic)
     end for
 end sub
 
+' pointsColor: dim until a player has scored, green once they beat their projection, red below zero
+function pointsColor(state as string) as string
+    if state = "beat" then return COLOR_LEADING
+    if state = "negative" then return COLOR_NEGATIVE
+    if state = "zero" then return COLOR_DIM
+    return COLOR_NEUTRAL
+end function
+
 ' getRow: Rows are created the first time they are needed, then reused on every refresh
 function getRow(index as integer) as object
     if index < m.rows.count() then return m.rows[index]
@@ -99,10 +127,10 @@ function getRow(index as integer) as object
     group = createObject("roSGNode", "Group")
     group.translation = [0, index * ROW_HEIGHT]
 
-    slotLabel = makeLabel(0, 64, "font:SmallestSystemFont", COLOR_MUTED, "left")
-    nameLabel = makeLabel(72, 254, "font:SmallSystemFont", COLOR_NEUTRAL, "left")
-    projLabel = makeLabel(330, 80, "font:SmallSystemFont", COLOR_MUTED, "right")
-    ptsLabel = makeLabel(420, 100, "font:SmallBoldSystemFont", COLOR_NEUTRAL, "right")
+    slotLabel = makeLabel(0, 52, "font:SmallestSystemFont", 18, COLOR_MUTED, "left")
+    nameLabel = makeLabel(56, 186, "font:SmallSystemFont", 24, COLOR_NEUTRAL, "left")
+    projLabel = makeLabel(242, 56, "font:SmallSystemFont", 20, COLOR_MUTED, "right")
+    ptsLabel = makeLabel(298, 70, "font:SmallBoldSystemFont", 24, COLOR_NEUTRAL, "right")
 
     group.appendChild(slotLabel)
     group.appendChild(nameLabel)
@@ -115,17 +143,22 @@ function getRow(index as integer) as object
     return row
 end function
 
-function makeLabel(left as integer, width as integer, fontName as string, color as string, align as string) as object
+function makeLabel(left as integer, width as integer, fontUri as string, fontSize as integer, color as string, align as string) as object
     label = createObject("roSGNode", "Label")
     label.translation = [left, 0]
     label.width = width
     label.height = ROW_HEIGHT
     label.vertAlign = "center"
     label.horizAlign = align
-    label.font = fontName
+    setFont(label, fontUri, fontSize)
     label.color = color
     return label
 end function
+
+sub setFont(label as object, fontUri as string, fontSize as integer)
+    label.font = fontUri
+    label.font.size = fontSize
+end sub
 
 ' toText: Label.text must be a string, so never hand it invalid or a number
 function toText(value as dynamic) as string

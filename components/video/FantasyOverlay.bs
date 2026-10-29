@@ -6,15 +6,17 @@ const COLOR_WARNING = "0xFFCC66FF"
 const DEFAULT_POLL_SECONDS = 30
 const MIN_POLL_SECONDS = 10
 
-' Card geometry.  These must agree with FantasyOverlay.xml and FantasyColumn.xml.
-const CARD_WIDTH = 1100
-const MESSAGE_WIDTH = 640
-const MESSAGE_HEIGHT = 46
-const COLUMNS_TOP = 50
-const ROWS_TOP = 128
-const ROW_HEIGHT = 38
-const BOTTOM_PADDING = 20
-const DIVIDER_TOP = 56
+' Card geometry.  These must agree with FantasyOverlay.xml and FantasyColumn.xml:
+' two 368-wide columns, a 20px gap and 14px of padding all round = 784.
+const CARD_WIDTH = 784
+const CARD_PADDING = 14
+const MESSAGE_WIDTH = 600
+const MESSAGE_HEIGHT = 36
+const COLUMNS_TOP = 36
+const ROWS_TOP = 156
+const ROW_HEIGHT = 32
+const BOTTOM_PADDING = 14
+const DIVIDER_TOP = 42
 
 ' Fantasy matchup overlay: both teams side by side, like ESPN's box score.
 '
@@ -27,6 +29,9 @@ sub init()
     m.leftColumn = m.top.findNode("leftColumn")
     m.rightColumn = m.top.findNode("rightColumn")
     m.divider = m.top.findNode("divider")
+
+    m.weekLabel.font = "font:SmallSystemFont"
+    m.weekLabel.font.size = 20
 
     appInfo = createObject("roAppInfo")
     m.endpoint = appInfo.getValue("fantasy_endpoint")
@@ -130,7 +135,7 @@ end sub
 sub showFullLayout(rowCount as integer)
     m.card.width = CARD_WIDTH
     m.card.height = COLUMNS_TOP + ROWS_TOP + rowCount * ROW_HEIGHT + BOTTOM_PADDING
-    m.weekLabel.width = CARD_WIDTH - 40
+    m.weekLabel.width = CARD_WIDTH - 2 * CARD_PADDING
 
     m.divider.height = m.card.height - DIVIDER_TOP - BOTTOM_PADDING
     m.divider.visible = true
@@ -142,7 +147,7 @@ end sub
 sub showMessageLayout()
     m.card.width = MESSAGE_WIDTH
     m.card.height = MESSAGE_HEIGHT
-    m.weekLabel.width = MESSAGE_WIDTH - 40
+    m.weekLabel.width = MESSAGE_WIDTH - 2 * CARD_PADDING
 
     m.divider.visible = false
     m.leftColumn.visible = false

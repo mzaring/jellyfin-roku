@@ -169,11 +169,29 @@ function playerStat(player, period, sourceId) {
   return hit && isNumber(hit.appliedTotal) ? hit.appliedTotal : null;
 }
 
+// Compact names to save width: "Joe Burrow" -> "J. Burrow", "Kyle Pitts Sr." -> "K. Pitts Sr.",
+// "Amon-Ra St. Brown" -> "A. St. Brown". Team defenses have no first name ("Bears D/ST" -> "Bears",
+// since the slot column already says D/ST).
 function playerName(player) {
   const full =
-    player.fullName || `${player.firstName || ''} ${player.lastName || ''}`.trim() || 'Unknown';
-  // The slot column already says D/ST
-  return full.replace(/\s+D\/ST$/i, '');
+    (player.fullName || `${player.firstName || ''} ${player.lastName || ''}`).trim() || 'Unknown';
+  if (/\s+D\/ST$/i.test(full)) return full.replace(/\s+D\/ST$/i, '');
+
+  const [first, ...rest] = full.split(/\s+/);
+  if (rest.length === 0) return full;
+  return `${first[0].toUpperCase()}. ${rest.join(' ')}`;
+}
+
+// How a player's points should be colored on the TV:
+//   zero     hasn't scored (game not started, or a true zero)  -> dimmed
+//   negative below zero                                        -> red
+//   beat     at or above the projection                        -> green
+//   scored   on the board but short of the projection          -> white
+function pointsState(actual, projected) {
+  if (actual < 0) return 'negative';
+  if (actual === 0) return 'zero';
+  if (projected !== null && actual >= projected) return 'beat';
+  return 'scored';
 }
 
 // ESPN style: one decimal when that says it all (19.0, 16.7), two otherwise (22.12)
@@ -220,6 +238,7 @@ function formatSide(side, team, statPeriod) {
   }
 
   return {
+    teamId: team ? team.id : null,
     name: teamName(team),
     score: (pointsOf(side) ?? 0).toFixed(2),
     proj: projected === null ? '' : projected.toFixed(1),
@@ -229,6 +248,7 @@ function formatSide(side, team, statPeriod) {
       name: p.name,
       proj: p.proj === null ? '--' : p.proj.toFixed(1),
       pts: formatPlayerPoints(p.actual),
+      state: pointsState(p.actual, p.proj),
     })),
   };
 }
@@ -283,21 +303,29 @@ const SAMPLE_LINEUPS = {
   1: [
     [0, 'Casey Archer', 18.2], [2, 'Dana Brooks', 15.4], [2, 'Eli Carter', 13.9],
     [4, 'Finn Dawson', 16.8], [4, 'Gus Ellison', 12.3], [6, 'Hal Foster', 9.6],
-    [23, 'Ira Gibbs', 11.1], [16, 'Harbor City D/ST', 7.5], [17, 'Jay Hollis', 8.9],
+    [23, 'Ira Gibbs', 11.1], [16, 'Harbor City D/ST', 7.5], [17, 'Jay Hollis', 8.9, 0], // 0: hasn't played yet
     [20, 'Bench Player', 5.0],
   ],
   2: [
     [0, 'Kit Landry', 20.1], [2, 'Lou Mercer', 14.2], [2, 'Max Norwood', 12.8],
     [4, 'Ned Overton', 17.4], [4, 'Oz Prescott', 13.5], [6, 'Pat Quill', 8.7],
-    [23, 'Quinn Rowe', 10.3], [16, 'Lakeside D/ST', 6.8], [17, 'Reed Sutton', 9.2],
+    [23, 'Quinn Rowe', 10.3], [16, 'Lakeside D/ST', 6.8, -2], [17, 'Reed Sutton', 9.2], // -2: a bad defense day
     [20, 'Reserve Player', 4.0],
   ],
 };
 
+// Some players run ahead of their projection and some behind, so every color shows up
+const SAMPLE_WOBBLE = [1.3, 0.8, 1.1, 1.5, 0.7, 0.95, 1.2, 1, 0.9];
+
 function sampleSide(teamId, progress, factor, period) {
-  const entries = SAMPLE_LINEUPS[teamId].map(([lineupSlotId, fullName, proj]) => {
+  const entries = SAMPLE_LINEUPS[teamId].map(([lineupSlotId, fullName, proj, fixedPoints], index) => {
     const benched = NON_STARTER_SLOTS.has(lineupSlotId);
-    const actual = benched ? 0 : Math.round(proj * (factor + 0.9 * progress) * 100) / 100;
+    const wobble = SAMPLE_WOBBLE[index % SAMPLE_WOBBLE.length];
+    const actual = benched
+      ? 0
+      : fixedPoints !== undefined
+        ? fixedPoints
+        : Math.round(proj * (factor + 0.9 * progress) * wobble * 100) / 100;
     return {
       lineupSlotId,
       playerPoolEntry: {
@@ -318,8 +346,9 @@ function sampleRaw(now = Date.now()) {
     scoringPeriodId: 8,
     status: { currentMatchupPeriod: 8 },
     teams: [
-      { id: 1, name: 'Sample Squad', abbrev: 'SMPL', owners: ['{SAMPLE-SWID}'] },
-      { id: 2, name: 'Gridiron Ghosts', abbrev: 'GHST', owners: ['{OTHER-SWID}'] },
+      // sample.invalid is never fetched: sample mode serves a generated logo instead
+      { id: 1, name: 'Sample Squad', abbrev: 'SMPL', owners: ['{SAMPLE-SWID}'], logo: 'https://sample.invalid/logo-1.png' },
+      { id: 2, name: 'Gridiron Ghosts of the Midwest', abbrev: 'GHST', owners: ['{OTHER-SWID}'], logo: 'https://sample.invalid/logo-2.png' },
     ],
     schedule: [
       {

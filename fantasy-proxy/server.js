@@ -1,13 +1,17 @@
 'use strict';
 
-// Tiny HTTP service the Roku overlay polls. Needs Node 20+; no dependencies.
+// Tiny HTTP service the Roku overlay polls. Needs Node 22.9+; the only dependency is optional
+// (@resvg/resvg-js, used to turn SVG team logos into PNGs the Roku can draw).
 //
-//   GET /matchup   display-ready matchup JSON (cached)
-//   GET /health    liveness check
-//   GET /raw       raw ESPN response, only when ENABLE_RAW=1 (for debugging)
+//   GET /matchup           display-ready matchup JSON (cached)
+//   GET /logo/<teamId>.png a team's logo, fetched from ESPN and served from here
+//   GET /health            liveness check
+//   GET /raw               raw ESPN response, only when ENABLE_RAW=1 (for debugging)
 
+const crypto = require('node:crypto');
 const http = require('node:http');
 const { UserError, defaultSeason, loadRaw, buildMatchup, sampleRaw } = require('./espn');
+const { LogoError, loadLogo, samplePng } = require('./logo');
 
 const env = process.env;
 const cfg = {
@@ -37,11 +41,46 @@ if (!cfg.sample && Boolean(cfg.espnS2) !== Boolean(cfg.swid)) {
 let cache = { at: 0, body: null };
 let inflight = null;
 
+// teamId -> the logo address ESPN gave us, and the downloaded image once we have it
+const logoSources = new Map();
+const logoImages = new Map();
+const logoWarned = new Set();
+
 async function refresh() {
   const raw = cfg.sample ? sampleRaw() : await loadRaw(cfg);
   const body = buildMatchup(raw, cfg);
+  for (const side of [body.me, body.opp]) {
+    if (side && side.logo) logoSources.set(side.teamId, side.logo);
+  }
   cache = { at: Date.now(), body };
   return body;
+}
+
+// The overlay is told to fetch logos from this proxy, using the same address it reached us at
+function withLocalLogos(body, host) {
+  if (!body || !body.me || !body.opp) return body;
+  const localize = (side) => {
+    if (!side.logo) return side;
+    const version = crypto.createHash('sha1').update(side.logo).digest('hex').slice(0, 8);
+    return { ...side, logo: `http://${host}/logo/${side.teamId}.png?v=${version}` };
+  };
+  return { ...body, me: localize(body.me), opp: localize(body.opp) };
+}
+
+async function getLogo(teamId) {
+  const source = logoSources.get(teamId);
+  if (!source) return null;
+
+  if (!logoImages.has(source)) {
+    if (cfg.sample) {
+      logoImages.set(source, { type: 'image/png', bytes: samplePng(teamId === 1 ? [214, 106, 50] : [50, 120, 200]) });
+    } else {
+      const logo = await loadLogo(source);
+      console.log(`Team ${teamId} logo ready (${logo.converted ? 'converted from SVG' : logo.type}): ${source}`);
+      logoImages.set(source, logo);
+    }
+  }
+  return logoImages.get(source);
 }
 
 async function getMatchup() {
@@ -75,7 +114,38 @@ const server = http.createServer(async (req, res) => {
   if (path === '/health') return send(res, 200, { ok: true });
 
   try {
-    if (path === '/matchup') return send(res, 200, await getMatchup());
+    if (path === '/matchup') {
+      const host = req.headers.host || `localhost:${cfg.port}`;
+      return send(res, 200, withLocalLogos(await getMatchup(), host));
+    }
+
+    const logoRoute = /^\/logo\/(\d+)\.png$/.exec(path);
+    if (logoRoute) {
+      const teamId = Number(logoRoute[1]);
+      // Logos are fetched on demand, so make sure we know which team is which first
+      if (!logoSources.has(teamId)) await getMatchup();
+
+      let logo;
+      try {
+        logo = await getLogo(teamId);
+      } catch (err) {
+        // A missing logo is cosmetic: say why once, not every 30 seconds
+        const source = logoSources.get(teamId);
+        if (err instanceof LogoError && !logoWarned.has(source)) {
+          logoWarned.add(source);
+          console.warn(`[${new Date().toISOString()}] Team ${teamId} logo: ${err.message} (${source})`);
+        }
+        throw err;
+      }
+      if (!logo) return send(res, 404, { ok: false, error: 'No logo for that team' });
+
+      res.writeHead(200, {
+        'Content-Type': logo.type,
+        'Content-Length': logo.bytes.length,
+        'Cache-Control': 'public, max-age=3600',
+      });
+      return res.end(logo.bytes);
+    }
 
     if (path === '/raw' && cfg.enableRaw) {
       return send(res, 200, cfg.sample ? sampleRaw() : await loadRaw(cfg));
@@ -84,7 +154,8 @@ const server = http.createServer(async (req, res) => {
     return send(res, 404, { ok: false, error: 'Not found' });
   } catch (err) {
     if (err instanceof UserError) {
-      console.warn(`[${new Date().toISOString()}] ${err.message}`);
+      // Logo problems are already logged once, with the address that caused them
+      if (!(err instanceof LogoError)) console.warn(`[${new Date().toISOString()}] ${err.message}`);
       return send(res, err.status, { ok: false, error: err.message });
     }
     console.error(err);

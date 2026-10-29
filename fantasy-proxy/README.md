@@ -1,21 +1,23 @@
 # Fantasy matchup overlay for Jellyfin Roku
 
-Select the scoreboard button in Jellyfin's playback controls and a box score appears over the video with your ESPN fantasy football matchup: both teams side by side, each with its logo, projected and actual totals, and every starter's projected and actual points. Select the button again to hide it.
+Select the scoreboard button in Jellyfin's playback controls and a box score appears in the upper right corner of the video with your ESPN fantasy football matchup: both teams side by side, each with its logo, projected and actual totals, and every starter's projected and actual points. Select the button again to hide it.
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                            Week 8                             │
-│ (logo) Sample Squad            │ (logo) Gridiron Ghosts       │
-│        Proj 113.7     85.98    │        Proj 113.0     79.80  │  ← leader's score is green
-│ ────────────────────────────── │ ──────────────────────────── │
-│        PLAYER      PROJ   PTS  │        PLAYER      PROJ  PTS │
-│ QB     Casey Archer 18.2 13.76 │ QB     Kit Landry  20.1 14.2 │
-│ RB     Dana Brooks  15.4 11.65 │ RB     Lou Mercer  14.2 10.03│
-│ ...                            │ ...                          │
-└───────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                        Week 8                       │
+│ (logo) Sample Squad      │ (logo) Gridiron Ghosts   │
+│                          │        of the Midwest    │
+│ Proj 113.7        86.98  │ Proj 113.0        79.93  │
+├──────────────────────────┼──────────────────────────┤
+│ QB  C. Archer 18.2 17.9  │ QB  K. Landry 20.1 18.5  │
+│ RB  D. Brooks 15.4  9.3  │ RB  L. Mercer 14.2  8.0  │
+│ ...                      │ ...                      │
+└──────────────────────────┴──────────────────────────┘
 ```
 
-Only starters are listed (no bench or injured reserve). The card sits below the row of buttons in the playback controls, so it never covers them.
+- Only starters are listed (no bench or injured reserve), as first initial and last name.
+- Each player's points are colored: **dim gray** until they score, **white** once they're on the board, **green** once they match or beat their projection, and **red** below zero. A team's total is dim at 0.00 and green for whichever team is ahead.
+- The card sits to the right of the row of buttons in the playback controls, so it never covers them.
 
 There are two pieces:
 
@@ -26,10 +28,13 @@ There are two pieces:
 
 Needs [Node.js](https://nodejs.org) 22.9 or newer, on any always-on machine on your network (the Jellyfin server is a natural fit).
 
+Run `npm install` once in this folder. It adds one optional helper that turns SVG team logos into PNGs, which is the only kind the Roku can show. The proxy still runs without it, but logos that are SVGs won't appear.
+
 **Try it with fake data first** (no ESPN account needed):
 
 ```bash
 cd fantasy-proxy
+npm install
 cp .env.example .env      # then edit .env: uncomment SAMPLE=1 and leave the rest alone
 npm start
 ```
@@ -79,7 +84,7 @@ Your store copy of Jellyfin is a separate app and is not affected. The fork show
 | *Week N - no matchup* | A bye week, or ESPN has no matchup scheduled for you yet. |
 | Scores look wrong or projections are blank | ESPN's API is unofficial. Set `ENABLE_RAW=1`, restart, open `/raw`, and compare with `espn.js`. |
 | Totals show but the player lists are empty | ESPN didn't include lineups in its response. Open `/raw` (needs `ENABLE_RAW=1`) and look for `rosterForCurrentScoringPeriod` under `schedule`. |
-| Team names show but no logos | The logo address from ESPN is missing or in a format the Roku can't draw (for example SVG). Open `/raw` and look at `teams[].logo`. Without a logo the name simply moves left. |
+| Team names show but no logos | The proxy downloads each logo from ESPN and serves it itself, and logs the reason it couldn't (look in `proxy.log`, or the proxy window, for a line starting `Team 1 logo:`). *Run "npm install"* means the logo is an SVG and the converter isn't installed. *WebP* means the Roku can't display that format. If there's no line at all, ESPN sent no logo: open `/raw` and look at `teams[].logo`. Without a logo the team name simply moves left. |
 
 ## Not yet verified
 

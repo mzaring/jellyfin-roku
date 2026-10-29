@@ -58,8 +58,8 @@ test('formats a matchup for display and marks the leader', () => {
   assert.equal(out.ok, true);
   assert.equal(out.label, 'Week 8');
   assert.equal(out.lead, 'me');
-  assert.deepEqual(out.me, { name: 'Mine', score: '101.24', proj: '', logo: '', players: [] });
-  assert.deepEqual(out.opp, { name: 'Their Team', score: '99.50', proj: '', logo: '', players: [] });
+  assert.deepEqual(out.me, { teamId: 1, name: 'Mine', score: '101.24', proj: '', logo: '', players: [] });
+  assert.deepEqual(out.opp, { teamId: 2, name: 'Their Team', score: '99.50', proj: '', logo: '', players: [] });
 });
 
 test('works when my team is the away side', () => {
@@ -196,6 +196,53 @@ test('strips the D/ST suffix because the slot column already says it', () => {
   assert.equal(dst.slot, 'D/ST');
 });
 
+test('shortens player names to first initial and last name', () => {
+  const names = [
+    'Joe Burrow',
+    'Kyle Pitts Sr.',
+    'Amon-Ra St. Brown',
+    'Jaxon Smith-Njigba',
+    'C.J. Stroud',
+    "D'Andre Swift",
+    'Marvin Harrison Jr.',
+    'Cher',
+  ];
+  const raw = withRosters(names.map((name, i) => entry(i === 0 ? 0 : 4, name, { proj: 1, actual: 1 })));
+  assert.deepEqual(
+    buildMatchup(raw, { teamId: 1 }).me.players.map((p) => p.name),
+    ['J. Burrow', 'K. Pitts Sr.', 'A. St. Brown', 'J. Smith-Njigba', 'C. Stroud', 'D. Swift', 'M. Harrison Jr.', 'Cher'],
+  );
+});
+
+test('each player gets a color state: zero, scored, beat the projection, or negative', () => {
+  const raw = withRosters([
+    entry(0, 'Not Yet', { proj: 17.6, actual: 0 }),
+    entry(2, 'Some Points', { proj: 16.3, actual: 8.1 }),
+    entry(4, 'Hit It', { proj: 10, actual: 10 }),
+    entry(6, 'Beat It', { proj: 9.5, actual: 19.9 }),
+    entry(16, 'Bad Day D/ST', { proj: 5, actual: -2 }),
+    entry(17, 'No Projection', { actual: 4 }),
+  ]);
+  // Display order is QB, RB, WR, TE, D/ST, K
+  const players = buildMatchup(raw, { teamId: 1 }).me.players;
+  assert.deepEqual(
+    players.map((p) => [p.name, p.state]),
+    [
+      ['N. Yet', 'zero'],
+      ['S. Points', 'scored'],
+      ['H. It', 'beat'], // exactly the projection counts as hitting it
+      ['B. It', 'beat'],
+      ['Bad Day', 'negative'],
+      ['N. Projection', 'scored'], // nothing to compare against, so just "on the board"
+    ],
+  );
+});
+
+test('team ids are passed along so logos can be addressed', () => {
+  const out = buildMatchup(league(), { teamId: 1 });
+  assert.deepEqual([out.me.teamId, out.opp.teamId], [1, 2]);
+});
+
 test('projected total is the sum of the starters, ignoring the bench', () => {
   const raw = withRosters([
     entry(0, 'A', { proj: 17.6, actual: 1 }),
@@ -315,7 +362,8 @@ test('season rolls over after the new year', () => {
 test('sample data runs through the same parser, with full lineups', () => {
   const out = buildMatchup(sampleRaw(), { teamId: '1' });
   assert.equal(out.me.name, 'Sample Squad');
-  assert.equal(out.opp.name, 'Gridiron Ghosts');
+  assert.equal(out.opp.name, 'Gridiron Ghosts of the Midwest', 'long on purpose, to show the wrapped team name');
+  assert.match(out.me.logo, /^https:\/\//);
   assert.match(out.me.score, /^\d+\.\d{2}$/);
   assert.equal(out.me.players.length, 9);
   assert.equal(out.opp.players.length, 9);

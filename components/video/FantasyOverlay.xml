@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="FantasyOverlay" extends="Group">
   <children>
-    <Rectangle id="card" width="1100" height="540" color="0x000000E0">
+    <!-- Size is adjusted in code to fit the lineups; these are the values for nine starters -->
+    <Rectangle id="card" width="784" height="494" color="0x000000E0">
       <!-- Week label, and the place status messages ("Loading...", errors) are shown -->
-      <Label id="weekLabel" translation="[20,8]" width="1060" height="30" vertAlign="center" horizAlign="center" font="font:SmallSystemFont" color="0xAAAAAAFF" />
+      <Label id="weekLabel" translation="[14,6]" width="756" height="26" vertAlign="center" horizAlign="center" color="0xAAAAAAFF" />
 
-      <FantasyColumn id="leftColumn" translation="[20,50]" />
-      <Rectangle id="divider" translation="[549,56]" width="2" height="464" color="0xFFFFFF33" />
-      <FantasyColumn id="rightColumn" translation="[560,50]" />
+      <FantasyColumn id="leftColumn" translation="[14,36]" />
+      <Rectangle id="divider" translation="[391,42]" width="2" height="438" color="0xFFFFFF33" />
+      <FantasyColumn id="rightColumn" translation="[402,36]" />
     </Rectangle>
 
     <!-- Polls only while the overlay is visible; duration comes from the manifest -->
