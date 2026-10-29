@@ -92,7 +92,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(cfg.port, () => {
+server.listen(cfg.port, '0.0.0.0', () => {
   const mode = cfg.sample ? 'SAMPLE data' : `league ${cfg.leagueId}, season ${cfg.season}`;
   console.log(`fantasy-proxy listening on :${cfg.port} (${mode})`);
   console.log(`  try: http://localhost:${cfg.port}/matchup`);
