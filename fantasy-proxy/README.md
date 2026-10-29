@@ -1,22 +1,22 @@
 # Fantasy matchup overlay for Jellyfin Roku
 
-Select the scoreboard button in Jellyfin's playback controls and a box score appears in the upper right corner of the video with your ESPN fantasy football matchup: both teams side by side, each with its logo, projected and actual totals, and every starter's projected and actual points. Select the button again to hide it.
+Select the scoreboard button in Jellyfin's playback controls and a box score appears in the upper right corner of the video with your ESPN fantasy football matchup: both teams side by side like the ESPN app: logo, totals, a win-probability bar, and each starter's projected and actual points, with the position (QB, RB...) shown once in the middle. Select the button again to hide it.
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                        Week 8                       │
-│ (logo) Sample Squad      │ (logo) Gridiron Ghosts   │
-│                          │        of the Midwest    │
-│ Proj 113.7        86.98  │ Proj 113.0        79.93  │
-├──────────────────────────┼──────────────────────────┤
-│ QB  C. Archer 18.2 17.9  │ QB  K. Landry 20.1 18.5  │
-│ RB  D. Brooks 15.4  9.3  │ RB  L. Mercer 14.2  8.0  │
-│ ...                      │ ...                      │
-└──────────────────────────┴──────────────────────────┘
+┌───────────────────────────────────────────────┐
+│ 86.98 (logo)        Week 8        (logo) 79.93│
+│ Proj 113.7                       Proj 113.0   │
+│ Sample Squad            Gridiron Ghosts       │
+│ 59% ███████░░░░       ░░░░███████ 41%         │
+├─────────────────────┬────┬────────────────────┤
+│ C. Archer  18.2 17.9│ QB │17.9 18.5  K. Landry│
+│ D. Brooks  15.4  9.3│ RB │ 8.0 14.2  L. Mercer│
+└─────────────────────┴────┴────────────────────┘
 ```
 
 - Only starters are listed (no bench or injured reserve), as first initial and last name.
 - Each player's points are colored: **dim gray** until they score, **white** once they're on the board, **green** once they match or beat their projection, and **red** below zero. A team's total is dim at 0.00 and green for whichever team is ahead.
+- The win-percentage bar is the proxy's own estimate, not ESPN's number: it compares each team's score plus the projection for the part of the week left, and tightens as the week is played. Expect it to differ a few points from the ESPN app.
 - The card sits to the right of the row of buttons in the playback controls, so it never covers them.
 
 There are two pieces:

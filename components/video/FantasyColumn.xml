@@ -2,26 +2,29 @@
 <component name="FantasyColumn" extends="Group">
   <interface>
     <!-- One team's data from the fantasy proxy:
-         { name, score, proj, logo, leading (boolean), players: [{ slot, name, proj, pts, state }] } -->
+         { name, score, proj, logo, win, leading (boolean), players: [{ slot, name, proj, pts, state }] } -->
     <field id="side" type="assocarray" alwaysNotify="true" onChange="onSideChanged" />
+    <!-- True for the right-hand team: the layout is flipped so points sit next to the center slot strip -->
+    <field id="mirror" type="boolean" value="false" onChange="onMirrorChanged" />
   </interface>
 
-  <!-- Fonts and sizes are set in FantasyColumn.bs so every size lives in one place -->
+  <!-- Positions, fonts and sizes are set in FantasyColumn.bs so every number lives in one place -->
   <children>
-    <!-- Team header: logo and name (up to two lines), then projected and actual totals -->
-    <Poster id="logo" translation="[0,0]" width="64" height="64" loadDisplayMode="scaleToFit" />
-    <Label id="teamName" translation="[72,0]" width="296" height="72" vertAlign="center" wrap="true" numLines="2" color="0xFFFFFFFF" />
-    <Label id="projTotal" translation="[0,80]" width="170" height="36" vertAlign="center" color="0xAAAAAAFF" />
-    <Label id="score" translation="[170,76]" width="198" height="44" vertAlign="center" horizAlign="right" color="0xFFFFFFFF" />
+    <Poster id="logo" width="60" height="60" loadDisplayMode="scaleToFit" />
+    <Label id="score" height="38" vertAlign="center" color="0xFFFFFFFF" />
+    <Label id="projTotal" height="22" vertAlign="center" color="0xAAAAAAFF" />
+    <Label id="teamName" height="56" vertAlign="top" wrap="true" numLines="2" color="0xFFFFFFFF" />
 
-    <Rectangle translation="[0,124]" width="368" height="2" color="0xFFFFFF33" />
+    <!-- Projected win percentage bar -->
+    <Label id="winText" height="24" vertAlign="center" color="0xFFFFFFFF" />
+    <Rectangle id="winTrack" height="8" color="0x555555FF">
+      <Rectangle id="winFill" height="8" color="0x2EE05AFF" />
+    </Rectangle>
 
-    <!-- Column headings -->
-    <Label id="headPlayer" translation="[56,130]" width="150" height="22" vertAlign="center" text="PLAYER" color="0xAAAAAAFF" />
-    <Label id="headProj" translation="[242,130]" width="56" height="22" vertAlign="center" horizAlign="right" text="PROJ" color="0xAAAAAAFF" />
-    <Label id="headPts" translation="[298,130]" width="70" height="22" vertAlign="center" horizAlign="right" text="PTS" color="0xAAAAAAFF" />
+    <Label id="headProj" height="22" vertAlign="center" text="PROJ" color="0xAAAAAAFF" />
+    <Label id="headPts" height="22" vertAlign="center" text="PTS" color="0xAAAAAAFF" />
 
     <!-- Player rows are created in code, one per starter -->
-    <Group id="rows" translation="[0,156]" />
+    <Group id="rows" />
   </children>
 </component>

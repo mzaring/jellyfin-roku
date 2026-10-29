@@ -253,6 +253,29 @@ function formatSide(side, team, statPeriod) {
   };
 }
 
+// Normal CDF (Abramowitz-Stegun erf approximation)
+function normalCdf(z) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+  const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  const erf = 1 - poly * Math.exp(-(z * z) / 2);
+  return 0.5 * (1 + (z >= 0 ? erf : -erf));
+}
+
+// Estimated chance (whole percent, 1-99) that side A wins.  This is the proxy's own estimate, not
+// ESPN's number: each team's expected final is what it has scored plus its projection scaled by how
+// much of the week is left (guessed from points scored vs. projected), and the spread shrinks as the
+// week is played.  Returns [a, b] summing to 100.
+const WIN_SPREAD = 50;
+function winPercents(aScore, aProj, bScore, bProj) {
+  const projSum = aProj + bProj;
+  const played = projSum > 0 ? Math.min(1, Math.max(0, (aScore + bScore) / projSum)) : 0;
+  const left = 1 - played;
+  const diff = aScore + aProj * left - (bScore + bProj * left);
+  const spread = WIN_SPREAD * Math.sqrt(Math.max(left, 0.02));
+  const a = Math.min(99, Math.max(1, Math.round(normalCdf(diff / spread) * 100)));
+  return [a, 100 - a];
+}
+
 // raw: ESPN league JSON. Returns the exact shape the Roku overlay renders.
 function buildMatchup(raw, opts) {
   if (!raw || typeof raw !== 'object') throw new UserError('ESPN sent unreadable data');
@@ -290,6 +313,15 @@ function buildMatchup(raw, opts) {
 
   const myPoints = pointsOf(mySide) ?? 0;
   const oppPoints = pointsOf(oppSide) ?? 0;
+  const [myWin, oppWin] = winPercents(
+    myPoints,
+    parseFloat(me.proj) || 0,
+    oppPoints,
+    parseFloat(opp.proj) || 0,
+  );
+  me.win = myWin;
+  opp.win = oppWin;
+
   const lead = myPoints > oppPoints ? 'me' : oppPoints > myPoints ? 'opp' : 'tie';
 
   return { ok: true, label, lead, me, opp, fetchedAt: new Date().toISOString() };
@@ -369,4 +401,5 @@ module.exports = {
   buildMatchup,
   sampleRaw,
   findMyTeamId,
+  winPercents,
 };

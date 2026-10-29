@@ -6,34 +6,96 @@ const COLOR_DIM = "0x777777FF" ' nothing scored yet
 const COLOR_LEADING = "0x5CE07AFF" ' team in front, and players beating their projection
 const COLOR_NEGATIVE = "0xFF7A7AFF"
 
-' Layout.  The column is 368 wide: slot | name | projected | points.
-' If you change a width here, change COLUMN_WIDTH in FantasyOverlay.bs and the
-' numbers in FantasyColumn.xml / FantasyOverlay.xml to match.
-const COLUMN_WIDTH = 368
+' Layout.  One team's half is 308 wide.  If you change COLUMN_WIDTH, change the card size in
+' FantasyOverlay.bs and the positions in FantasyOverlay.xml to match.
+const COLUMN_WIDTH = 308
+const LOGO_SIZE = 60
+const LOGO_GAP = 8
+const NAME_TOP = 66
+const WIN_TOP = 126
+const WIN_LABEL_WIDTH = 54
+const WIN_BAR_HEIGHT = 8
+const HEAD_TOP = 154
+const ROWS_TOP = 178
 const ROW_HEIGHT = 32
-const NAME_LEFT_WITH_LOGO = 72
-const NAME_LEFT_NO_LOGO = 0
 
-' One team's half of the fantasy overlay: logo, name, projected and actual totals, and one row
-' per starting player.  Data arrives all at once through the `side` field.
+' Row cells (width): name 158, projected 62, points 88.
+const NAME_WIDTH = 158
+const PROJ_WIDTH = 62
+const PTS_WIDTH = 88
+
+' One team's half of the fantasy overlay: logo, totals, name, win bar and one row per starter.
+' The right-hand team is mirrored so both teams' points sit beside the shared slot column.
 sub init()
     m.logo = m.top.findNode("logo")
     m.teamName = m.top.findNode("teamName")
     m.projTotal = m.top.findNode("projTotal")
     m.score = m.top.findNode("score")
+    m.winText = m.top.findNode("winText")
+    m.winTrack = m.top.findNode("winTrack")
+    m.winFill = m.top.findNode("winFill")
+    m.headProj = m.top.findNode("headProj")
+    m.headPts = m.top.findNode("headPts")
     m.rowsGroup = m.top.findNode("rows")
 
-    setFont(m.teamName, "font:MediumBoldSystemFont", 30)
-    setFont(m.projTotal, "font:SmallSystemFont", 22)
-    setFont(m.score, "font:LargeBoldSystemFont", 40)
-    setFont(m.top.findNode("headPlayer"), "font:SmallestSystemFont", 16)
-    setFont(m.top.findNode("headProj"), "font:SmallestSystemFont", 16)
-    setFont(m.top.findNode("headPts"), "font:SmallestSystemFont", 16)
+    setFont(m.teamName, "font:MediumBoldSystemFont", 26)
+    setFont(m.projTotal, "font:SmallSystemFont", 20)
+    setFont(m.score, "font:LargeBoldSystemFont", 38)
+    setFont(m.winText, "font:SmallSystemFont", 20)
+    setFont(m.headProj, "font:SmallestSystemFont", 16)
+    setFont(m.headPts, "font:SmallestSystemFont", 16)
 
     m.rows = []
     m.logoFailed = false
+    m.logoUri = ""
+    m.winPercent = 0
+    m.mirror = false
 
     m.logo.observeField("loadStatus", "onLogoLoadStatusChanged")
+    applyLayout()
+end sub
+
+sub onMirrorChanged()
+    m.mirror = m.top.mirror
+    applyLayout()
+    updateWinBar(m.winPercent)
+    for each row in m.rows
+        layoutRow(row)
+    end for
+end sub
+
+' applyLayout: place the header pieces, left-aligned or mirrored
+sub applyLayout()
+    mirror = m.mirror
+    align = mirror ? "right" : "left"
+    textWidth = COLUMN_WIDTH - LOGO_SIZE - LOGO_GAP
+    textLeft = mirror ? 0 : LOGO_SIZE + LOGO_GAP
+
+    m.logo.translation = [mirror ? COLUMN_WIDTH - LOGO_SIZE : 0, 0]
+
+    place(m.score, textLeft, 0, textWidth, align)
+    place(m.projTotal, textLeft, 38, textWidth, align)
+    showLogo(m.logo.visible)
+
+    place(m.winText, mirror ? COLUMN_WIDTH - WIN_LABEL_WIDTH : 0, WIN_TOP - 8, WIN_LABEL_WIDTH, align)
+    m.winTrack.width = COLUMN_WIDTH - WIN_LABEL_WIDTH - 6
+    m.winTrack.translation = [mirror ? 0 : WIN_LABEL_WIDTH + 6, WIN_TOP]
+
+    if mirror
+        place(m.headPts, 0, HEAD_TOP, PTS_WIDTH, "left")
+        place(m.headProj, PTS_WIDTH, HEAD_TOP, PROJ_WIDTH, "left")
+    else
+        place(m.headProj, NAME_WIDTH, HEAD_TOP, PROJ_WIDTH, "right")
+        place(m.headPts, NAME_WIDTH + PROJ_WIDTH, HEAD_TOP, PTS_WIDTH, "right")
+    end if
+
+    m.rowsGroup.translation = [0, ROWS_TOP]
+end sub
+
+sub place(label as object, left as integer, top as integer, width as integer, align as string)
+    label.translation = [left, top]
+    label.width = width
+    label.horizAlign = align
 end sub
 
 sub onSideChanged()
@@ -55,8 +117,22 @@ sub onSideChanged()
         m.score.color = COLOR_NEUTRAL
     end if
 
+    percent = 0
+    if side.win <> invalid and GetInterface(side.win, "ifFloat") <> invalid then percent = Int(side.win)
+    updateWinBar(percent)
+
     updateLogo(toText(side.logo))
     updateRows(side.players)
+end sub
+
+' updateWinBar: the green fill grows from the outer edge of the card toward the center
+sub updateWinBar(percent as integer)
+    m.winPercent = percent
+    m.winText.text = percent.toStr() + "%"
+
+    fill = Int(m.winTrack.width * percent / 100)
+    m.winFill.width = fill
+    m.winFill.translation = [m.mirror ? m.winTrack.width - fill : 0, 0]
 end sub
 
 sub updateLogo(uri as string)
@@ -81,13 +157,18 @@ sub onLogoLoadStatusChanged()
     end if
 end sub
 
-' showLogo: With no logo, slide the team name left into the freed space
+' showLogo: With no logo, the name and totals use the freed space
 sub showLogo(visible as boolean)
     m.logo.visible = visible
 
-    left = visible ? NAME_LEFT_WITH_LOGO : NAME_LEFT_NO_LOGO
-    m.teamName.translation = [left, 0]
-    m.teamName.width = COLUMN_WIDTH - left
+    used = visible ? LOGO_SIZE + LOGO_GAP : 0
+    textWidth = COLUMN_WIDTH - used
+    textLeft = m.mirror ? 0 : used
+    align = m.mirror ? "right" : "left"
+
+    place(m.score, textLeft, 0, textWidth, align)
+    place(m.projTotal, textLeft, 38, textWidth, align)
+    place(m.teamName, 0, NAME_TOP, COLUMN_WIDTH, align)
 end sub
 
 sub updateRows(players as dynamic)
@@ -99,7 +180,6 @@ sub updateRows(players as dynamic)
         row = getRow(i)
 
         row.group.visible = true
-        row.slot.text = toText(player.slot)
         row.name.text = toText(player.name)
         row.proj.text = toText(player.proj)
         row.pts.text = toText(player.pts)
@@ -127,29 +207,38 @@ function getRow(index as integer) as object
     group = createObject("roSGNode", "Group")
     group.translation = [0, index * ROW_HEIGHT]
 
-    slotLabel = makeLabel(0, 52, "font:SmallestSystemFont", 18, COLOR_MUTED, "left")
-    nameLabel = makeLabel(56, 186, "font:SmallSystemFont", 24, COLOR_NEUTRAL, "left")
-    projLabel = makeLabel(242, 56, "font:SmallSystemFont", 20, COLOR_MUTED, "right")
-    ptsLabel = makeLabel(298, 70, "font:SmallBoldSystemFont", 24, COLOR_NEUTRAL, "right")
+    nameLabel = makeLabel("font:SmallSystemFont", 24, COLOR_NEUTRAL)
+    projLabel = makeLabel("font:SmallSystemFont", 20, COLOR_MUTED)
+    ptsLabel = makeLabel("font:SmallBoldSystemFont", 24, COLOR_NEUTRAL)
 
-    group.appendChild(slotLabel)
     group.appendChild(nameLabel)
     group.appendChild(projLabel)
     group.appendChild(ptsLabel)
     m.rowsGroup.appendChild(group)
 
-    row = { group: group, slot: slotLabel, name: nameLabel, proj: projLabel, pts: ptsLabel }
+    row = { group: group, name: nameLabel, proj: projLabel, pts: ptsLabel }
+    layoutRow(row)
     m.rows.push(row)
     return row
 end function
 
-function makeLabel(left as integer, width as integer, fontUri as string, fontSize as integer, color as string, align as string) as object
+' layoutRow: name | projected | points, or points | projected | name when mirrored
+sub layoutRow(row as object)
+    if m.mirror
+        place(row.pts, 0, 0, PTS_WIDTH, "left")
+        place(row.proj, PTS_WIDTH, 0, PROJ_WIDTH, "left")
+        place(row.name, PTS_WIDTH + PROJ_WIDTH, 0, NAME_WIDTH, "right")
+    else
+        place(row.name, 0, 0, NAME_WIDTH, "left")
+        place(row.proj, NAME_WIDTH, 0, PROJ_WIDTH, "right")
+        place(row.pts, NAME_WIDTH + PROJ_WIDTH, 0, PTS_WIDTH, "right")
+    end if
+end sub
+
+function makeLabel(fontUri as string, fontSize as integer, color as string) as object
     label = createObject("roSGNode", "Label")
-    label.translation = [left, 0]
-    label.width = width
     label.height = ROW_HEIGHT
     label.vertAlign = "center"
-    label.horizAlign = align
     setFont(label, fontUri, fontSize)
     label.color = color
     return label

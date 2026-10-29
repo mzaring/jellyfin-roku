@@ -71,9 +71,9 @@
     </Rectangle>
 
     <!-- Fantasy matchup overlay, toggled from the scoreboard button in the playback controls.
-         Upper right corner: 784 wide, so its right edge is at x 1817, the same edge the OSD uses for
+         Upper right corner: 708 wide, so its right edge is at x 1817, the same edge the OSD uses for
          its clock and progress bar. The OSD's row of buttons ends near x 923, so nothing is covered. -->
-    <FantasyOverlay id="fantasyOverlay" visible="false" translation="[1033,90]" />
+    <FantasyOverlay id="fantasyOverlay" visible="false" translation="[1109,90]" />
 
     <StandardButton id="skipSegment" visible="false" height="85" width="275" translation="[1500, 950]" />
 

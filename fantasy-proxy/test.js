@@ -58,8 +58,8 @@ test('formats a matchup for display and marks the leader', () => {
   assert.equal(out.ok, true);
   assert.equal(out.label, 'Week 8');
   assert.equal(out.lead, 'me');
-  assert.deepEqual(out.me, { teamId: 1, name: 'Mine', score: '101.24', proj: '', logo: '', players: [] });
-  assert.deepEqual(out.opp, { teamId: 2, name: 'Their Team', score: '99.50', proj: '', logo: '', players: [] });
+  assert.deepEqual(out.me, { teamId: 1, name: 'Mine', score: '101.24', proj: '', logo: '', players: [], win: 51 });
+  assert.deepEqual(out.opp, { teamId: 2, name: 'Their Team', score: '99.50', proj: '', logo: '', players: [], win: 49 });
 });
 
 test('works when my team is the away side', () => {
@@ -379,4 +379,20 @@ test('sample team totals equal the sum of the listed players', () => {
     const sum = out.me.players.reduce((total, p) => total + Number(p.pts), 0);
     assert.ok(Math.abs(sum - Number(out.me.score)) < 0.2, `${sum} vs ${out.me.score}`);
   }
+});
+
+test('win percentages: even teams split 50/50, leaders favored, always sum to 100', () => {
+  const { winPercents } = require('./espn');
+  assert.deepEqual(winPercents(0, 100, 0, 100), [50, 50]);
+  const [a, b] = winPercents(0, 135.6, 0, 102.3);
+  assert.ok(a > 50 && a < 99);
+  assert.equal(a + b, 100);
+  // A big lead late in the week is close to decided
+  const [lead] = winPercents(150, 100, 100, 100);
+  assert.ok(lead >= 95);
+});
+
+test('matchup includes a win percentage for each side', () => {
+  const m = buildMatchup(sampleRaw(), { teamId: 1 });
+  assert.equal(m.me.win + m.opp.win, 100);
 });

@@ -2,13 +2,15 @@
 <component name="FantasyOverlay" extends="Group">
   <children>
     <!-- Size is adjusted in code to fit the lineups; these are the values for nine starters -->
-    <Rectangle id="card" width="784" height="494" color="0x000000E0">
+    <Rectangle id="card" width="708" height="516" color="0x000000E0">
       <!-- Week label, and the place status messages ("Loading...", errors) are shown -->
-      <Label id="weekLabel" translation="[14,6]" width="756" height="26" vertAlign="center" horizAlign="center" color="0xAAAAAAFF" />
+      <Label id="weekLabel" translation="[14,6]" width="680" height="26" vertAlign="center" horizAlign="center" color="0xAAAAAAFF" />
 
       <FantasyColumn id="leftColumn" translation="[14,36]" />
-      <Rectangle id="divider" translation="[391,42]" width="2" height="438" color="0xFFFFFF33" />
-      <FantasyColumn id="rightColumn" translation="[402,36]" />
+      <!-- Shared position column between the two lineups, like the ESPN app -->
+      <Rectangle id="slotStrip" translation="[322,190]" width="64" height="300" color="0xFFFFFF14" />
+      <Group id="slots" translation="[322,214]" />
+      <FantasyColumn id="rightColumn" translation="[386,36]" mirror="true" />
     </Rectangle>
 
     <!-- Polls only while the overlay is visible; duration comes from the manifest -->

@@ -7,16 +7,17 @@ const DEFAULT_POLL_SECONDS = 30
 const MIN_POLL_SECONDS = 10
 
 ' Card geometry.  These must agree with FantasyOverlay.xml and FantasyColumn.xml:
-' two 368-wide columns, a 20px gap and 14px of padding all round = 784.
-const CARD_WIDTH = 784
+' two 308-wide columns, a 64px slot strip between them and 14px of padding all round = 708.
+const CARD_WIDTH = 708
+const SLOT_WIDTH = 64
 const CARD_PADDING = 14
 const MESSAGE_WIDTH = 600
 const MESSAGE_HEIGHT = 36
 const COLUMNS_TOP = 36
-const ROWS_TOP = 156
+const ROWS_TOP = 178
 const ROW_HEIGHT = 32
 const BOTTOM_PADDING = 14
-const DIVIDER_TOP = 42
+const STRIP_TOP = 154
 
 ' Fantasy matchup overlay: both teams side by side, like ESPN's box score.
 '
@@ -28,7 +29,9 @@ sub init()
     m.weekLabel = m.top.findNode("weekLabel")
     m.leftColumn = m.top.findNode("leftColumn")
     m.rightColumn = m.top.findNode("rightColumn")
-    m.divider = m.top.findNode("divider")
+    m.slotStrip = m.top.findNode("slotStrip")
+    m.slotsGroup = m.top.findNode("slots")
+    m.slotLabels = []
 
     m.weekLabel.font = "font:SmallSystemFont"
     m.weekLabel.font.size = 20
@@ -121,6 +124,7 @@ sub render(data as dynamic)
 
     m.leftColumn.side = mine
     m.rightColumn.side = theirs
+    updateSlots(mine.players, theirs.players)
 
     ' Size the card for whichever lineup is longer
     rowCount = playerCount(mine)
@@ -137,8 +141,10 @@ sub showFullLayout(rowCount as integer)
     m.card.height = COLUMNS_TOP + ROWS_TOP + rowCount * ROW_HEIGHT + BOTTOM_PADDING
     m.weekLabel.width = CARD_WIDTH - 2 * CARD_PADDING
 
-    m.divider.height = m.card.height - DIVIDER_TOP - BOTTOM_PADDING
-    m.divider.visible = true
+    m.slotStrip.translation = [CARD_PADDING + 308, COLUMNS_TOP + STRIP_TOP]
+    m.slotStrip.height = m.card.height - COLUMNS_TOP - STRIP_TOP - BOTTOM_PADDING
+    m.slotStrip.visible = true
+    m.slotsGroup.visible = true
     m.leftColumn.visible = true
     m.rightColumn.visible = true
 end sub
@@ -149,7 +155,8 @@ sub showMessageLayout()
     m.card.height = MESSAGE_HEIGHT
     m.weekLabel.width = MESSAGE_WIDTH - 2 * CARD_PADDING
 
-    m.divider.visible = false
+    m.slotStrip.visible = false
+    m.slotsGroup.visible = false
     m.leftColumn.visible = false
     m.rightColumn.visible = false
 end sub
@@ -164,6 +171,42 @@ sub showError(message as string)
         showMessageLayout()
         m.weekLabel.text = message
     end if
+end sub
+
+' updateSlots: position labels (QB, RB, ...) are drawn once, in the strip between the lineups
+sub updateSlots(mine as dynamic, theirs as dynamic)
+    m.slotsGroup.translation = [CARD_PADDING + 308, COLUMNS_TOP + ROWS_TOP]
+
+    count = 0
+    if type(mine) = "roArray" then count = mine.count()
+    if type(theirs) = "roArray" and theirs.count() > count then count = theirs.count()
+
+    for i = 0 to count - 1
+        text = ""
+        if type(mine) = "roArray" and i < mine.count() then text = toText(mine[i].slot)
+        if text = "" and type(theirs) = "roArray" and i < theirs.count() then text = toText(theirs[i].slot)
+
+        if i >= m.slotLabels.count()
+            label = createObject("roSGNode", "Label")
+            label.translation = [0, i * ROW_HEIGHT]
+            label.width = SLOT_WIDTH
+            label.height = ROW_HEIGHT
+            label.horizAlign = "center"
+            label.vertAlign = "center"
+            label.font = "font:SmallBoldSystemFont"
+            label.font.size = 20
+            label.color = COLOR_MUTED
+            m.slotsGroup.appendChild(label)
+            m.slotLabels.push(label)
+        end if
+
+        m.slotLabels[i].text = text
+        m.slotLabels[i].visible = true
+    end for
+
+    for i = count to m.slotLabels.count() - 1
+        m.slotLabels[i].visible = false
+    end for
 end sub
 
 function playerCount(side as object) as integer
