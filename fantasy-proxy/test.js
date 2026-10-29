@@ -423,3 +423,11 @@ test('real-shaped ESPN entry: winProbability on the away side belongs to that te
   assert.equal(m.me.winPct, '34');
   assert.equal(m.opp.winPct, '66');
 });
+
+test('players carry their NFL team and the matchup says whether I am home', () => {
+  const m = buildMatchup(sampleRaw(), { teamId: 1 });
+  assert.equal(m.meIsHome, true);
+  assert.ok(m.me.players.every((p) => /^[a-z]{2,3}$/.test(p.team)));
+  const away = buildMatchup(sampleRaw(), { teamId: 2 });
+  assert.equal(away.meIsHome, false);
+});

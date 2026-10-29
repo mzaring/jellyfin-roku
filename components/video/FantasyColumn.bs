@@ -6,9 +6,9 @@ const COLOR_DIM = "0x777777FF" ' nothing scored yet
 const COLOR_LEADING = "0x5CE07AFF" ' team in front, and players beating their projection
 const COLOR_NEGATIVE = "0xFF7A7AFF"
 
-' Layout.  One team's half is 250 wide.  If you change COLUMN_WIDTH, change the card size in
+' Layout.  One team's half is 270 wide.  If you change COLUMN_WIDTH, change the card size in
 ' FantasyOverlay.bs and the positions in FantasyOverlay.xml to match.
-const COLUMN_WIDTH = 250
+const COLUMN_WIDTH = 270
 const LOGO_SIZE = 60
 const LOGO_GAP = 8
 const NAME_TOP = 78
@@ -20,8 +20,10 @@ const ROW_HEIGHT = 48
 const PTS_HEIGHT = 26
 const PROJ_HEIGHT = 20
 
-' Row cells: name 164 wide, then an 86-wide stack with points above projected.
-const NAME_WIDTH = 164
+' Row cells: name cell 184 wide (logo + name), then an 86-wide stack with points above projected.
+const NAME_WIDTH = 184
+const ROW_LOGO = 28
+const ROW_LOGO_GAP = 6
 const NUM_WIDTH = 86
 
 ' One team's half of the fantasy overlay: logo, totals, name, win bar and one row per starter.
@@ -170,6 +172,7 @@ sub updateRows(players as dynamic)
 
         row.group.visible = true
         row.name.text = toText(player.name)
+        showRowLogo(row, toText(player.logo))
         row.proj.text = toText(player.proj)
         ptsText = toText(player.pts)
         if toText(player.state) = "zero" or ptsText = "" then ptsText = "-"
@@ -198,20 +201,37 @@ function getRow(index as integer) as object
     group = createObject("roSGNode", "Group")
     group.translation = [0, index * ROW_HEIGHT]
 
-    nameLabel = makeLabel("font:SmallSystemFont", 24, COLOR_NEUTRAL, ROW_HEIGHT)
+    nameLabel = makeLabel("font:SmallSystemFont", 22, COLOR_NEUTRAL, ROW_HEIGHT)
     projLabel = makeLabel("font:SmallSystemFont", 18, COLOR_MUTED, PROJ_HEIGHT)
     ptsLabel = makeLabel("font:SmallBoldSystemFont", 24, COLOR_NEUTRAL, PTS_HEIGHT)
 
+    logo = createObject("roSGNode", "Poster")
+    logo.width = ROW_LOGO
+    logo.height = ROW_LOGO
+    logo.loadDisplayMode = "scaleToFit"
+    logo.visible = false
+
+    group.appendChild(logo)
     group.appendChild(nameLabel)
     group.appendChild(projLabel)
     group.appendChild(ptsLabel)
     m.rowsGroup.appendChild(group)
 
-    row = { group: group, name: nameLabel, proj: projLabel, pts: ptsLabel }
+    row = { group: group, logo: logo, name: nameLabel, proj: projLabel, pts: ptsLabel }
     layoutRow(row)
     m.rows.push(row)
     return row
 end function
+
+' showRowLogo: a player's NFL team logo beside the name (hidden for free agents / missing logos)
+sub showRowLogo(row as object, uri as string)
+    if uri = ""
+        row.logo.visible = false
+        return
+    end if
+    if row.logo.uri <> uri then row.logo.uri = uri
+    row.logo.visible = true
+end sub
 
 ' layoutRow: name beside a stack of points over projected; mirrored for the right-hand team
 sub layoutRow(row as object)
@@ -219,9 +239,13 @@ sub layoutRow(row as object)
     if m.mirror
         place(row.pts, 0, top, NUM_WIDTH, "left")
         place(row.proj, 0, top + PTS_HEIGHT, NUM_WIDTH, "left")
-        place(row.name, NUM_WIDTH, 0, NAME_WIDTH, "right")
+        nameWidth = NAME_WIDTH - ROW_LOGO - ROW_LOGO_GAP
+        place(row.name, NUM_WIDTH, 0, nameWidth, "right")
+        row.logo.translation = [COLUMN_WIDTH - ROW_LOGO, Int((ROW_HEIGHT - ROW_LOGO) / 2)]
     else
-        place(row.name, 0, 0, NAME_WIDTH, "left")
+        nameWidth = NAME_WIDTH - ROW_LOGO - ROW_LOGO_GAP
+        row.logo.translation = [0, Int((ROW_HEIGHT - ROW_LOGO) / 2)]
+        place(row.name, ROW_LOGO + ROW_LOGO_GAP, 0, nameWidth, "left")
         place(row.pts, NAME_WIDTH, top, NUM_WIDTH, "right")
         place(row.proj, NAME_WIDTH, top + PTS_HEIGHT, NUM_WIDTH, "right")
     end if

@@ -7,9 +7,9 @@ const DEFAULT_POLL_SECONDS = 30
 const MIN_POLL_SECONDS = 10
 
 ' Card geometry.  These must agree with FantasyOverlay.xml and FantasyColumn.xml:
-' two 250-wide columns, a 52px slot strip with an 8px dark gap each side, and 14px of padding = 596.
-const CARD_WIDTH = 596
-const COLUMN_WIDTH = 250
+' two 270-wide columns, a 52px slot strip with an 8px dark gap each side, and 14px of padding = 636.
+const CARD_WIDTH = 636
+const COLUMN_WIDTH = 270
 const SLOT_GAP = 8
 const SLOT_WIDTH = 52
 const CARD_PADDING = 14
@@ -124,13 +124,21 @@ sub render(data as dynamic)
     theirs = data.opp
     theirs.leading = (lead = "opp")
 
-    m.leftColumn.side = mine
-    m.rightColumn.side = theirs
-    updateSlots(mine.players, theirs.players)
+    ' Home team on the left, away on the right (home when the proxy doesn't say)
+    left = mine
+    right = theirs
+    if data.meIsHome = false
+        left = theirs
+        right = mine
+    end if
+
+    m.leftColumn.side = left
+    m.rightColumn.side = right
+    updateSlots(left.players, right.players)
 
     ' Size the card for whichever lineup is longer
-    rowCount = playerCount(mine)
-    if playerCount(theirs) > rowCount then rowCount = playerCount(theirs)
+    rowCount = playerCount(left)
+    if playerCount(right) > rowCount then rowCount = playerCount(right)
     showFullLayout(rowCount)
 
     m.weekLabel.text = stale ? label + "  (out of date)" : label

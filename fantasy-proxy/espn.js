@@ -201,6 +201,15 @@ function formatPlayerPoints(value) {
 }
 
 // Starting lineup for one side of the matchup, in display order
+// ESPN's numeric NFL team ids -> the abbreviations ESPN's logo files are named by
+const NFL_TEAMS = {
+  1: 'atl', 2: 'buf', 3: 'chi', 4: 'cin', 5: 'cle', 6: 'dal', 7: 'den', 8: 'det', 9: 'gb',
+  10: 'ten', 11: 'ind', 12: 'kc', 13: 'lv', 14: 'lar', 15: 'mia', 16: 'min', 17: 'ne', 18: 'no',
+  19: 'nyg', 20: 'nyj', 21: 'phi', 22: 'ari', 23: 'pit', 24: 'lac', 25: 'sf', 26: 'sea', 27: 'tb',
+  28: 'wsh', 29: 'car', 30: 'jax', 33: 'bal', 34: 'hou',
+};
+const NFL_ABBRS = new Set(Object.values(NFL_TEAMS));
+
 function lineupOf(side, statPeriod) {
   const starters = [];
   for (const entry of rosterEntries(side)) {
@@ -215,6 +224,7 @@ function lineupOf(side, statPeriod) {
     starters.push({
       slotId,
       name: playerName(player),
+      team: NFL_TEAMS[player.proTeamId] || '',
       proj: playerStat(player, statPeriod, 1),
       actual: isNumber(actual) ? actual : 0,
     });
@@ -246,6 +256,7 @@ function formatSide(side, team, statPeriod) {
     players: starters.map((p) => ({
       slot: SLOT_LABELS[p.slotId] || '',
       name: p.name,
+      team: p.team,
       proj: p.proj === null ? '--' : p.proj.toFixed(1),
       pts: formatPlayerPoints(p.actual),
       state: pointsState(p.actual, p.proj),
@@ -354,7 +365,9 @@ function buildMatchup(raw, opts) {
 
   const lead = myPoints > oppPoints ? 'me' : oppPoints > myPoints ? 'opp' : 'tie';
 
-  return { ok: true, label, lead, me, opp, fetchedAt: new Date().toISOString() };
+  const meIsHome = mySide === entry.home;
+
+  return { ok: true, label, lead, meIsHome, me, opp, fetchedAt: new Date().toISOString() };
 }
 
 // ---- Sample data -----------------------------------------------------------------------------
@@ -379,6 +392,8 @@ const SAMPLE_LINEUPS = {
 // Some players run ahead of their projection and some behind, so every color shows up
 const SAMPLE_WOBBLE = [1.3, 0.8, 1.1, 1.5, 0.7, 0.95, 1.2, 1, 0.9];
 
+const SAMPLE_TEAM_IDS = [26, 3, 12, 9, 25, 7, 21, 16, 2, 34];
+
 function sampleSide(teamId, progress, factor, period) {
   const entries = SAMPLE_LINEUPS[teamId].map(([lineupSlotId, fullName, proj, fixedPoints], index) => {
     const benched = NON_STARTER_SLOTS.has(lineupSlotId);
@@ -392,7 +407,7 @@ function sampleSide(teamId, progress, factor, period) {
       lineupSlotId,
       playerPoolEntry: {
         appliedStatTotal: actual,
-        player: { fullName, stats: [{ scoringPeriodId: period, statSourceId: 1, appliedTotal: proj }] },
+        player: { fullName, proTeamId: SAMPLE_TEAM_IDS[(teamId * 7 + index * 5) % SAMPLE_TEAM_IDS.length], stats: [{ scoringPeriodId: period, statSourceId: 1, appliedTotal: proj }] },
       },
     };
   });
@@ -433,4 +448,5 @@ module.exports = {
   findMyTeamId,
   winPercents,
   espnWinPercents,
+  NFL_ABBRS,
 };

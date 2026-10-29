@@ -5,12 +5,13 @@
 //
 //   GET /matchup           display-ready matchup JSON (cached)
 //   GET /logo/<teamId>.png a team's logo, fetched from ESPN and served from here
+//   GET /nfl/<abbr>.png    an NFL team's logo (small), fetched from ESPN and served from here
 //   GET /health            liveness check
 //   GET /raw               raw ESPN response, only when ENABLE_RAW=1 (for debugging)
 
 const crypto = require('node:crypto');
 const http = require('node:http');
-const { UserError, defaultSeason, loadRaw, buildMatchup, sampleRaw } = require('./espn');
+const { UserError, defaultSeason, loadRaw, buildMatchup, sampleRaw, NFL_ABBRS } = require('./espn');
 const { LogoError, loadLogo, samplePng } = require('./logo');
 
 const env = process.env;
@@ -60,9 +61,12 @@ async function refresh() {
 function withLocalLogos(body, host) {
   if (!body || !body.me || !body.opp) return body;
   const localize = (side) => {
-    if (!side.logo) return side;
+    const players = Array.isArray(side.players)
+      ? side.players.map((p) => (p.team ? { ...p, logo: `http://${host}/nfl/${p.team}.png` } : p))
+      : side.players;
+    if (!side.logo) return { ...side, players };
     const version = crypto.createHash('sha1').update(side.logo).digest('hex').slice(0, 8);
-    return { ...side, logo: `http://${host}/logo/${side.teamId}.png?v=${version}` };
+    return { ...side, players, logo: `http://${host}/logo/${side.teamId}.png?v=${version}` };
   };
   return { ...body, me: localize(body.me), opp: localize(body.opp) };
 }
@@ -81,6 +85,27 @@ async function getLogo(teamId) {
     }
   }
   return logoImages.get(source);
+}
+
+// NFL team logos: ESPN serves a resized PNG, with the full-size file as a fallback
+const nflLogos = new Map();
+async function getNflLogo(abbr) {
+  if (!nflLogos.has(abbr)) {
+    if (cfg.sample) {
+      const n = [...abbr].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
+      nflLogos.set(abbr, { type: 'image/png', bytes: samplePng([(n * 37) % 200 + 40, (n * 91) % 200 + 40, (n * 53) % 200 + 40], 64) });
+    } else {
+      const path = `/i/teamlogos/nfl/500/${abbr}.png`;
+      let logo;
+      try {
+        logo = await loadLogo(`https://a.espncdn.com/combiner/i?img=${path}&w=64&h=64`);
+      } catch (err) {
+        logo = await loadLogo(`https://a.espncdn.com${path}`);
+      }
+      nflLogos.set(abbr, logo);
+    }
+  }
+  return nflLogos.get(abbr);
 }
 
 async function getMatchup() {
@@ -117,6 +142,24 @@ const server = http.createServer(async (req, res) => {
     if (path === '/matchup') {
       const host = req.headers.host || `localhost:${cfg.port}`;
       return send(res, 200, withLocalLogos(await getMatchup(), host));
+    }
+
+    const nflRoute = /^\/nfl\/([a-z]+)\.png$/.exec(path);
+    if (nflRoute) {
+      const abbr = nflRoute[1];
+      if (!NFL_ABBRS.has(abbr)) return send(res, 404, { ok: false, error: 'No such team' });
+      let logo;
+      try {
+        logo = await getNflLogo(abbr);
+      } catch (err) {
+        if (!logoWarned.has(abbr)) {
+          logoWarned.add(abbr);
+          console.warn(`[${new Date().toISOString()}] NFL logo ${abbr}: ${err.message}`);
+        }
+        throw err;
+      }
+      res.writeHead(200, { 'Content-Type': logo.type, 'Content-Length': logo.bytes.length, 'Cache-Control': 'public, max-age=86400' });
+      return res.end(logo.bytes);
     }
 
     const logoRoute = /^\/logo\/(\d+)\.png$/.exec(path);
