@@ -7,9 +7,9 @@ const DEFAULT_POLL_SECONDS = 30
 const MIN_POLL_SECONDS = 10
 
 ' Card geometry.  These must agree with FantasyOverlay.xml and FantasyColumn.xml:
-' two 270-wide columns, a 52px slot strip with an 8px dark gap each side, and 14px of padding = 636.
-const CARD_WIDTH = 636
-const COLUMN_WIDTH = 270
+' two 240-wide columns, a 52px slot strip with an 8px dark gap each side, and 14px of padding = 576.
+const CARD_WIDTH = 576
+const COLUMN_WIDTH = 240
 const SLOT_GAP = 8
 const SLOT_WIDTH = 52
 const CARD_PADDING = 14

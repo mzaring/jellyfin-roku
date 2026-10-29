@@ -6,9 +6,9 @@ const COLOR_DIM = "0x777777FF" ' nothing scored yet
 const COLOR_LEADING = "0x5CE07AFF" ' team in front, and players beating their projection
 const COLOR_NEGATIVE = "0xFF7A7AFF"
 
-' Layout.  One team's half is 270 wide.  If you change COLUMN_WIDTH, change the card size in
+' Layout.  One team's half is 240 wide.  If you change COLUMN_WIDTH, change the card size in
 ' FantasyOverlay.bs and the positions in FantasyOverlay.xml to match.
-const COLUMN_WIDTH = 270
+const COLUMN_WIDTH = 240
 const LOGO_SIZE = 60
 const LOGO_GAP = 8
 const NAME_TOP = 78
@@ -20,11 +20,11 @@ const ROW_HEIGHT = 48
 const PTS_HEIGHT = 26
 const PROJ_HEIGHT = 20
 
-' Row cells: name cell 184 wide (logo + name), then an 86-wide stack with points above projected.
-const NAME_WIDTH = 184
+' Row cells: name cell 168 wide (logo + name), then a 72-wide stack with points above projected.
+const NAME_WIDTH = 168
 const ROW_LOGO = 28
 const ROW_LOGO_GAP = 6
-const NUM_WIDTH = 86
+const NUM_WIDTH = 72
 
 ' One team's half of the fantasy overlay: logo, totals, name, win bar and one row per starter.
 ' The right-hand team is mirrored so both teams' points sit beside the shared slot column.
