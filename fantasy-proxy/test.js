@@ -58,8 +58,8 @@ test('formats a matchup for display and marks the leader', () => {
   assert.equal(out.ok, true);
   assert.equal(out.label, 'Week 8');
   assert.equal(out.lead, 'me');
-  assert.deepEqual(out.me, { teamId: 1, name: 'Mine', score: '101.24', proj: '', logo: '', players: [], win: 51 });
-  assert.deepEqual(out.opp, { teamId: 2, name: 'Their Team', score: '99.50', proj: '', logo: '', players: [], win: 49 });
+  assert.deepEqual(out.me, { teamId: 1, name: 'Mine', score: '101.24', proj: '', logo: '', players: [], win: 51, winPct: '51' });
+  assert.deepEqual(out.opp, { teamId: 2, name: 'Their Team', score: '99.50', proj: '', logo: '', players: [], win: 49, winPct: '49' });
 });
 
 test('works when my team is the away side', () => {
@@ -413,4 +413,13 @@ test('uses ESPN win probability when present, as a fraction or a percent', () =>
   const m = buildMatchup(raw, { teamId: 1 });
   assert.equal(m.me.win, 80);
   assert.equal(m.opp.win, 20);
+});
+
+test('real-shaped ESPN entry: winProbability on the away side belongs to that team', () => {
+  const raw = league({
+    schedule: [{ matchupPeriodId: 8, home: { teamId: 2, totalPoints: 0 }, away: { teamId: 1, totalPoints: 0, winProbability: 0.34 } }],
+  });
+  const m = buildMatchup(raw, { teamId: 1 });
+  assert.equal(m.me.winPct, '34');
+  assert.equal(m.opp.winPct, '66');
 });

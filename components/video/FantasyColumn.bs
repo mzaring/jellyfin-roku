@@ -105,8 +105,9 @@ sub onSideChanged()
         m.score.color = COLOR_NEUTRAL
     end if
 
-    percent = 0
-    if side.win <> invalid and GetInterface(side.win, "ifFloat") <> invalid then percent = Int(side.win)
+    percent = Int(Val(toText(side.winPct)))
+    if percent < 0 then percent = 0
+    if percent > 100 then percent = 100
     updateWinBar(percent)
 
     updateLogo(toText(side.logo))

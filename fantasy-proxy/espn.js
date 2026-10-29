@@ -348,6 +348,9 @@ function buildMatchup(raw, opts) {
     winPercents(myPoints, parseFloat(me.proj) || 0, oppPoints, parseFloat(opp.proj) || 0);
   me.win = myWin;
   opp.win = oppWin;
+  // Also sent as text: the Roku reads numbers from JSON unreliably, text always works
+  me.winPct = String(myWin);
+  opp.winPct = String(oppWin);
 
   const lead = myPoints > oppPoints ? 'me' : oppPoints > myPoints ? 'opp' : 'tie';
 
