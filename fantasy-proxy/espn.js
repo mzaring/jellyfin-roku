@@ -394,7 +394,7 @@ const SAMPLE_WOBBLE = [1.3, 0.8, 1.1, 1.5, 0.7, 0.95, 1.2, 1, 0.9];
 
 const SAMPLE_TEAM_IDS = [26, 3, 12, 9, 25, 7, 21, 16, 2, 34];
 
-function sampleSide(teamId, progress, factor, period) {
+function sampleSide(teamId, progress, factor, period, step = 0) {
   const entries = SAMPLE_LINEUPS[teamId].map(([lineupSlotId, fullName, proj, fixedPoints], index) => {
     const benched = NON_STARTER_SLOTS.has(lineupSlotId);
     const wobble = SAMPLE_WOBBLE[index % SAMPLE_WOBBLE.length];
@@ -402,7 +402,7 @@ function sampleSide(teamId, progress, factor, period) {
       ? 0
       : fixedPoints !== undefined
         ? fixedPoints
-        : Math.round(proj * (factor + 0.9 * progress) * wobble * 100) / 100;
+        : Math.round(proj * (factor + 0.9 * progress) * wobble * 100) / 100 - (index === 2 && step % 7 === 0 ? 3 : 0); // now and then a stat correction knocks points off
     return {
       lineupSlotId,
       playerPoolEntry: {
@@ -417,8 +417,9 @@ function sampleSide(teamId, progress, factor, period) {
   return { teamId, totalPoints: Math.round(total * 100) / 100, rosterForCurrentScoringPeriod: { entries } };
 }
 
-function sampleRaw(now = Date.now()) {
-  const progress = (Math.floor(now / 60_000) % 240) / 240;
+function sampleRaw(now = Date.now(), stepMs = 60_000) {
+  const step = Math.floor(now / stepMs);
+  const progress = (step % 240) / 240;
   return {
     scoringPeriodId: 8,
     status: { currentMatchupPeriod: 8 },
@@ -430,8 +431,8 @@ function sampleRaw(now = Date.now()) {
     schedule: [
       {
         matchupPeriodId: 8,
-        home: sampleSide(1, progress, 0.4, 8),
-        away: sampleSide(2, progress, 0.35, 8),
+        home: sampleSide(1, progress, 0.4, 8, step),
+        away: sampleSide(2, progress, 0.35, 8, step),
       },
     ],
   };

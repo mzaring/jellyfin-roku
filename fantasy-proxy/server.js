@@ -25,6 +25,7 @@ const cfg = {
   port: Number(env.PORT) || 8765,
   cacheMs: (Number(env.CACHE_SECONDS) || 30) * 1000,
   enableRaw: env.ENABLE_RAW === '1',
+  sampleStepMs: (Number(env.SAMPLE_STEP_SECONDS) || 60) * 1000,
 };
 
 // If ESPN is briefly unreachable, keep serving the last good scores (marked stale) for this long.
@@ -48,7 +49,7 @@ const logoImages = new Map();
 const logoWarned = new Set();
 
 async function refresh() {
-  const raw = cfg.sample ? sampleRaw() : await loadRaw(cfg);
+  const raw = cfg.sample ? sampleRaw(Date.now(), cfg.sampleStepMs) : await loadRaw(cfg);
   const body = buildMatchup(raw, cfg);
   for (const side of [body.me, body.opp]) {
     if (side && side.logo) logoSources.set(side.teamId, side.logo);
