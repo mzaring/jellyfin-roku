@@ -72,6 +72,8 @@ sub onVisibleChange()
         m.pollTimer.control = TimerControl.START
     else
         m.pollTimer.control = TimerControl.STOP
+        m.leftColumn.resetFlash = true
+        m.rightColumn.resetFlash = true
     end if
 end sub
 

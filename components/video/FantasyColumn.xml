@@ -4,6 +4,8 @@
     <!-- One team's data from the fantasy proxy:
          { name, score, proj, logo, win, leading (boolean), players: [{ slot, name, proj, pts, state }] } -->
     <field id="side" type="assocarray" alwaysNotify="true" onChange="onSideChanged" />
+    <!-- Set to true when the overlay is hidden, so reopening it later does not flash every change since -->
+    <field id="resetFlash" type="boolean" alwaysNotify="true" onChange="onResetFlash" />
     <!-- True for the right-hand team: the layout is flipped so points sit next to the center slot strip -->
     <field id="mirror" type="boolean" value="false" onChange="onMirrorChanged" />
   </interface>
@@ -11,7 +13,9 @@
   <!-- Positions, fonts and sizes are set in FantasyColumn.bs so every number lives in one place -->
   <children>
     <Poster id="logo" width="60" height="60" loadDisplayMode="scaleToFit" />
-    <Label id="score" height="38" vertAlign="center" color="0xFFFFFFFF" />
+    <Group id="scoreGroup">
+      <Label id="score" height="38" vertAlign="center" color="0xFFFFFFFF" />
+    </Group>
     <Label id="projTotal" height="22" vertAlign="center" color="0xAAAAAAFF" />
     <Label id="teamName" height="66" vertAlign="top" wrap="true" numLines="2" color="0xFFFFFFFF" />
 
@@ -23,5 +27,8 @@
 
     <!-- Player rows are created in code, one per starter -->
     <Group id="rows" />
+
+    <!-- Drives the score pop animation and color flash -->
+    <Timer id="popTimer" repeat="true" duration="0.04" />
   </children>
 </component>

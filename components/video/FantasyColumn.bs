@@ -1,10 +1,20 @@
 import "pkg:/source/enums/PosterLoadStatus.bs"
+import "pkg:/source/enums/TimerControl.bs"
 
 const COLOR_NEUTRAL = "0xFFFFFFFF"
 const COLOR_MUTED = "0xAAAAAAFF"
 const COLOR_DIM = "0x777777FF" ' nothing scored yet
 const COLOR_LEADING = "0x5CE07AFF" ' team in front, and players beating their projection
 const COLOR_NEGATIVE = "0xFF7A7AFF"
+
+' Score-change animation: the number pops (grows and settles) and turns green for a rise or red for
+' a drop, with a small triangle beside a player's points, then returns to normal.
+const POP_STEPS = 12 ' ticks of 0.04s: about half a second
+const POP_SCALE = 0.35
+const FLASH_TICKS = 62 ' about 2.5 seconds
+const TRI_SIZE = 12
+const TRI_UP = "pkg:/images/icons/fantasyTriangleUp.png"
+const TRI_DOWN = "pkg:/images/icons/fantasyTriangleDown.png"
 
 ' Layout.  One team's half is 250 wide.  If you change COLUMN_WIDTH, change the card size in
 ' FantasyOverlay.bs and the positions in FantasyOverlay.xml to match.
@@ -36,6 +46,9 @@ sub init()
     m.teamName = m.top.findNode("teamName")
     m.projTotal = m.top.findNode("projTotal")
     m.score = m.top.findNode("score")
+    m.scoreGroup = m.top.findNode("scoreGroup")
+    m.popTimer = m.top.findNode("popTimer")
+    m.popTimer.observeField("fire", "onPopTick")
     m.winText = m.top.findNode("winText")
     m.winTrack = m.top.findNode("winTrack")
     m.winFill = m.top.findNode("winFill")
@@ -47,6 +60,12 @@ sub init()
     setFont(m.winText, "font:SmallSystemFont", 20)
 
     m.rows = []
+    m.prevPts = {}
+    m.hasBaseline = false
+    m.prevScore = invalid
+    m.scoreBase = COLOR_NEUTRAL
+    m.scoreFlashTicks = 0
+    m.scorePopStep = -1
     m.logoFailed = false
     m.logoUri = ""
     m.winPercent = 0
@@ -54,6 +73,11 @@ sub init()
 
     m.logo.observeField("loadStatus", "onLogoLoadStatusChanged")
     applyLayout()
+end sub
+
+sub onResetFlash()
+    m.hasBaseline = false
+    m.prevScore = invalid
 end sub
 
 sub onMirrorChanged()
@@ -74,7 +98,7 @@ sub applyLayout()
 
     m.logo.translation = [mirror ? COLUMN_WIDTH - LOGO_SIZE : 0, 0]
 
-    place(m.score, textLeft, 0, textWidth, align)
+    placeScore(textLeft, textWidth, align)
     place(m.projTotal, textLeft, 38, textWidth, align)
     showLogo(m.logo.visible)
 
@@ -83,6 +107,15 @@ sub applyLayout()
     m.winTrack.translation = [mirror ? 0 : WIN_LABEL_WIDTH + 6, WIN_TOP]
 
     m.rowsGroup.translation = [0, ROWS_TOP]
+end sub
+
+' placeScore: the score sits in a group so it can be scaled around its own edge
+sub placeScore(left as integer, width as integer, align as string)
+    m.scoreGroup.translation = [left, 0]
+    m.score.translation = [0, 0]
+    m.score.width = width
+    m.score.horizAlign = align
+    m.scoreGroup.scaleRotateCenter = [(align = "right") ? width : 0, 19]
 end sub
 
 sub place(label as object, left as integer, top as integer, width as integer, align as string)
@@ -103,12 +136,24 @@ sub onSideChanged()
     scoreText = toText(side.score)
     m.score.text = scoreText
     if side.leading = true
-        m.score.color = COLOR_LEADING
+        m.scoreBase = COLOR_LEADING
     else if Val(scoreText) = 0
-        m.score.color = COLOR_DIM
+        m.scoreBase = COLOR_DIM
     else
-        m.score.color = COLOR_NEUTRAL
+        m.scoreBase = COLOR_NEUTRAL
     end if
+
+    scoreValue = Val(scoreText)
+    if m.prevScore <> invalid
+        if scoreValue <> m.prevScore
+            m.scoreFlashTicks = FLASH_TICKS
+            m.scorePopStep = 0
+            m.score.color = (scoreValue > m.prevScore) ? COLOR_LEADING : COLOR_NEGATIVE
+            m.popTimer.control = TimerControl.START
+        end if
+    end if
+    m.prevScore = scoreValue
+    if m.scoreFlashTicks <= 0 then m.score.color = m.scoreBase
 
     percent = Int(Val(toText(side.winPct)))
     if percent < 0 then percent = 0
@@ -165,7 +210,7 @@ sub showLogo(visible as boolean)
     textLeft = m.mirror ? 0 : used
     align = m.mirror ? "right" : "left"
 
-    place(m.score, textLeft, 0, textWidth, align)
+    placeScore(textLeft, textWidth, align)
     place(m.projTotal, textLeft, 38, textWidth, align)
     place(m.teamName, 0, NAME_TOP, COLUMN_WIDTH, align)
 end sub
@@ -174,6 +219,7 @@ sub updateRows(players as dynamic)
     if type(players) <> "roArray" then players = []
 
     count = players.count()
+    newPts = {}
     for i = 0 to count - 1
         player = players[i]
         row = getRow(i)
@@ -181,17 +227,118 @@ sub updateRows(players as dynamic)
         row.group.visible = true
         row.name.text = toText(player.name)
         showRowLogo(row, toText(player.logo))
-        row.proj.text = toText(player.proj)
         ptsText = toText(player.pts)
+        pointsValue = Val(ptsText)
         if toText(player.state) = "zero" or ptsText = "" then ptsText = "-"
         row.pts.text = ptsText
-        row.pts.color = pointsColor(toText(player.state))
+        row.proj.text = toText(player.proj)
+
+        row.baseColor = pointsColor(toText(player.state))
+        key = toText(player.name)
+        newPts[key] = pointsValue
+
+        previous = m.prevPts[key]
+        if m.hasBaseline and previous <> invalid
+            if pointsValue <> previous then flashRow(row, pointsValue > previous)
+        end if
+        if row.flashTicks <= 0 then row.pts.color = row.baseColor
     end for
 
     ' Hide rows left over from a longer lineup
     for i = count to m.rows.count() - 1
         m.rows[i].group.visible = false
+        m.rows[i].flashTicks = 0
+        m.rows[i].tri.visible = false
     end for
+
+    m.prevPts = newPts
+    if count > 0 then m.hasBaseline = true
+end sub
+
+' flashRow: pop a player's points and show a triangle: green and up for a rise, red and down for a drop
+sub flashRow(row as object, rose as boolean)
+    row.flashTicks = FLASH_TICKS
+    row.popStep = 0
+    row.pts.color = rose ? COLOR_LEADING : COLOR_NEGATIVE
+    row.tri.uri = rose ? TRI_UP : TRI_DOWN
+    positionTriangle(row)
+    row.tri.visible = true
+    m.popTimer.control = TimerControl.START
+end sub
+
+' positionTriangle: just inside the points number (its width is estimated from the characters)
+sub positionTriangle(row as object)
+    textWidth = 0
+    text = row.pts.text
+    for i = 0 to Len(text) - 1
+        ch = Mid(text, i + 1, 1)
+        if ch = "." then
+            textWidth = textWidth + 7
+        else if ch = "-" then
+            textWidth = textWidth + 8
+        else
+            textWidth = textWidth + 13
+        end if
+    end for
+
+    top = Int((ROW_HEIGHT - PTS_HEIGHT - PROJ_HEIGHT) / 2) + Int((PTS_HEIGHT - TRI_SIZE) / 2)
+    if m.mirror
+        row.tri.translation = [ROW_PAD + textWidth + 4, top]
+    else
+        row.tri.translation = [ROW_PAD + NAME_WIDTH + NUM_WIDTH - textWidth - TRI_SIZE - 4, top]
+    end if
+end sub
+
+' onPopTick: advance every running pop, and return colors to normal when a flash has run its course
+sub onPopTick()
+    active = false
+
+    for each row in m.rows
+        if row.flashTicks > 0
+            active = true
+            row.flashTicks = row.flashTicks - 1
+
+            if row.popStep >= 0
+                row.popStep = row.popStep + 1
+                if row.popStep >= POP_STEPS
+                    row.popStep = -1
+                    row.ptsGroup.scale = [1, 1]
+                else
+                    grow = 1 + POP_SCALE * Sin(3.14159 * row.popStep / POP_STEPS)
+                    row.ptsGroup.scale = [grow, grow]
+                end if
+            end if
+
+            if row.flashTicks <= 0
+                row.pts.color = row.baseColor
+                row.tri.visible = false
+                row.ptsGroup.scale = [1, 1]
+            end if
+        end if
+    end for
+
+    if m.scoreFlashTicks > 0
+        active = true
+        m.scoreFlashTicks = m.scoreFlashTicks - 1
+
+        if m.scorePopStep >= 0
+            m.scorePopStep = m.scorePopStep + 1
+            if m.scorePopStep >= POP_STEPS
+                m.scorePopStep = -1
+                m.scoreGroup.scale = [1, 1]
+            else
+                grow = 1 + POP_SCALE * Sin(3.14159 * m.scorePopStep / POP_STEPS)
+                m.scoreGroup.scale = [grow, grow]
+            end if
+        end if
+
+        if m.scoreFlashTicks <= 0
+            m.score.color = m.scoreBase
+            m.scoreGroup.scale = [1, 1]
+        end if
+    end if
+
+    if not active then m.popTimer.control = TimerControl.STOP
 end sub
 
 ' pointsColor: dim until a player has scored, green once they beat their projection, red below zero
@@ -229,10 +376,18 @@ function getRow(index as integer) as object
     group.appendChild(logo)
     group.appendChild(nameLabel)
     group.appendChild(projLabel)
-    group.appendChild(ptsLabel)
+    ptsGroup = createObject("roSGNode", "Group")
+    ptsGroup.appendChild(ptsLabel)
+    group.appendChild(ptsGroup)
+
+    tri = createObject("roSGNode", "Poster")
+    tri.width = TRI_SIZE
+    tri.height = TRI_SIZE
+    tri.visible = false
+    group.appendChild(tri)
     m.rowsGroup.appendChild(group)
 
-    row = { group: group, logo: logo, name: nameLabel, proj: projLabel, pts: ptsLabel }
+    row = { group: group, logo: logo, name: nameLabel, proj: projLabel, pts: ptsLabel, ptsGroup: ptsGroup, tri: tri, flashTicks: 0, popStep: -1, baseColor: COLOR_NEUTRAL }
     layoutRow(row)
     m.rows.push(row)
     return row
@@ -254,14 +409,20 @@ sub layoutRow(row as object)
     logoTop = Int((ROW_HEIGHT - ROW_LOGO) / 2)
     nameWidth = NAME_WIDTH - ROW_LOGO - ROW_LOGO_GAP
     if m.mirror
-        place(row.pts, ROW_PAD, top, NUM_WIDTH, "left")
+        row.ptsGroup.translation = [ROW_PAD, top]
+        row.pts.width = NUM_WIDTH
+        row.pts.horizAlign = "left"
+        row.ptsGroup.scaleRotateCenter = [0, Int(PTS_HEIGHT / 2)]
         place(row.proj, ROW_PAD, top + PTS_HEIGHT, NUM_WIDTH, "left")
         place(row.name, ROW_PAD + NUM_WIDTH, 0, nameWidth, "right")
         row.logo.translation = [COLUMN_WIDTH - ROW_PAD - ROW_LOGO, logoTop]
     else
         row.logo.translation = [ROW_PAD, logoTop]
         place(row.name, ROW_PAD + ROW_LOGO + ROW_LOGO_GAP, 0, nameWidth, "left")
-        place(row.pts, ROW_PAD + NAME_WIDTH, top, NUM_WIDTH, "right")
+        row.ptsGroup.translation = [ROW_PAD + NAME_WIDTH, top]
+        row.pts.width = NUM_WIDTH
+        row.pts.horizAlign = "right"
+        row.ptsGroup.scaleRotateCenter = [NUM_WIDTH, Int(PTS_HEIGHT / 2)]
         place(row.proj, ROW_PAD + NAME_WIDTH, top + PTS_HEIGHT, NUM_WIDTH, "right")
     end if
 end sub
