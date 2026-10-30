@@ -11,7 +11,7 @@ const COLOR_NEGATIVE = "0xFF7A7AFF"
 ' a drop, with a small triangle beside a player's points, then returns to normal.
 const POP_STEPS = 12 ' ticks of 0.04s: about half a second
 const POP_SCALE = 0.35
-const FLASH_TICKS = 62 ' number stays colored about 2.5 seconds
+const FLASH_TICKS = 12 ' number stays colored only for the pop itself (same length as POP_STEPS)
 const TRI_TICKS = 100 ' triangle stays fully visible about 4 seconds...
 const TRI_FADE_TICKS = 25 ' ...then fades out over 1 second
 const TRI_SIZE = 12
