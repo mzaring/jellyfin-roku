@@ -5,7 +5,7 @@ const COLOR_MUTED = "0xAAAAAAFF"
 const COLOR_WARNING = "0xFFCC66FF"
 ' Shrinks the whole overlay (text, logos, spacing) around its top-right corner so it stays
 ' pinned to the same screen edge.  1.0 is full size.
-const OVERLAY_SCALE = 0.95
+const OVERLAY_SCALE = 0.9
 const DEFAULT_POLL_SECONDS = 30
 const MIN_POLL_SECONDS = 10
 
