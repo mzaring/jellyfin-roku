@@ -3,6 +3,9 @@ import "pkg:/source/enums/TimerControl.bs"
 
 const COLOR_MUTED = "0xAAAAAAFF"
 const COLOR_WARNING = "0xFFCC66FF"
+' Shrinks the whole overlay (text, logos, spacing) around its top-right corner so it stays
+' pinned to the same screen edge.  1.0 is full size.
+const OVERLAY_SCALE = 0.95
 const DEFAULT_POLL_SECONDS = 30
 const MIN_POLL_SECONDS = 10
 
@@ -26,6 +29,9 @@ const BOTTOM_PADDING = 14
 ' While visible it polls the fantasy proxy named by `fantasy_endpoint` in the
 ' manifest every `fantasy_poll_seconds` seconds and renders the result.
 sub init()
+    m.top.scaleRotateCenter = [CARD_WIDTH, 0]
+    m.top.scale = [OVERLAY_SCALE, OVERLAY_SCALE]
+
     m.card = m.top.findNode("card")
     m.weekLabel = m.top.findNode("weekLabel")
     m.leftColumn = m.top.findNode("leftColumn")
