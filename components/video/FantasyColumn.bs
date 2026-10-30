@@ -272,9 +272,9 @@ sub positionTriangle(row as object)
     text = row.pts.text
     for i = 0 to Len(text) - 1
         ch = Mid(text, i + 1, 1)
-        if ch = "." then
+        if ch = "."
             textWidth = textWidth + 7
-        else if ch = "-" then
+        else if ch = "-"
             textWidth = textWidth + 8
         else
             textWidth = textWidth + 13
