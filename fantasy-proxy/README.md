@@ -16,7 +16,7 @@ Select the scoreboard button in Jellyfin's playback controls and a box score app
 
 - The home team is always on the left and the away team on the right. Each player has their NFL team's logo beside their name; the proxy downloads these from ESPN once and serves them itself (a missing one just leaves a gap).
 - Only starters are listed (no bench or injured reserve), as first initial and last name.
-- Each player's points are colored: **dim gray** until they score, **white** once they're on the board, **green** once they match or beat their projection, and **red** below zero. A team's total is dim at 0.00 and green for whichever team is ahead.
+- Scores are **dim gray** until a player scores and **white** otherwise. When a score changes, the number pops and turns **green** (up) or **red** (down) for a couple of seconds; a player's points also get a small up or down triangle that stays a few seconds and then fades out.
 - The win-percentage bar uses ESPN's own `winProbability` when the response includes one, and falls back to the proxy's own estimate (scores plus the projection for what's left of the week) when it doesn't.
 - The card sits to the right of the row of buttons in the playback controls, so it never covers them.
 

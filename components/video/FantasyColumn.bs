@@ -4,14 +4,16 @@ import "pkg:/source/enums/TimerControl.bs"
 const COLOR_NEUTRAL = "0xFFFFFFFF"
 const COLOR_MUTED = "0xAAAAAAFF"
 const COLOR_DIM = "0x777777FF" ' nothing scored yet
-const COLOR_LEADING = "0x5CE07AFF" ' team in front, and players beating their projection
+const COLOR_LEADING = "0x5CE07AFF" ' green flash for a rise in score
 const COLOR_NEGATIVE = "0xFF7A7AFF"
 
 ' Score-change animation: the number pops (grows and settles) and turns green for a rise or red for
 ' a drop, with a small triangle beside a player's points, then returns to normal.
 const POP_STEPS = 12 ' ticks of 0.04s: about half a second
 const POP_SCALE = 0.35
-const FLASH_TICKS = 62 ' about 2.5 seconds
+const FLASH_TICKS = 62 ' number stays colored about 2.5 seconds
+const TRI_TICKS = 100 ' triangle stays fully visible about 4 seconds...
+const TRI_FADE_TICKS = 25 ' ...then fades out over 1 second
 const TRI_SIZE = 12
 const TRI_UP = "pkg:/images/icons/fantasyTriangleUp.png"
 const TRI_DOWN = "pkg:/images/icons/fantasyTriangleDown.png"
@@ -135,9 +137,7 @@ sub onSideChanged()
 
     scoreText = toText(side.score)
     m.score.text = scoreText
-    if side.leading = true
-        m.scoreBase = COLOR_LEADING
-    else if Val(scoreText) = 0
+    if Val(scoreText) = 0
         m.scoreBase = COLOR_DIM
     else
         m.scoreBase = COLOR_NEUTRAL
@@ -248,6 +248,7 @@ sub updateRows(players as dynamic)
     for i = count to m.rows.count() - 1
         m.rows[i].group.visible = false
         m.rows[i].flashTicks = 0
+        m.rows[i].triTicks = 0
         m.rows[i].tri.visible = false
     end for
 
@@ -258,7 +259,9 @@ end sub
 ' flashRow: pop a player's points and show a triangle: green and up for a rise, red and down for a drop
 sub flashRow(row as object, rose as boolean)
     row.flashTicks = FLASH_TICKS
+    row.triTicks = TRI_TICKS + TRI_FADE_TICKS
     row.popStep = 0
+    row.tri.opacity = 1
     row.pts.color = rose ? COLOR_LEADING : COLOR_NEGATIVE
     row.tri.uri = rose ? TRI_UP : TRI_DOWN
     positionTriangle(row)
@@ -294,6 +297,17 @@ sub onPopTick()
     active = false
 
     for each row in m.rows
+        if row.triTicks > 0
+            active = true
+            row.triTicks = row.triTicks - 1
+            if row.triTicks <= 0
+                row.tri.visible = false
+                row.tri.opacity = 1
+            else if row.triTicks < TRI_FADE_TICKS
+                row.tri.opacity = row.triTicks / TRI_FADE_TICKS
+            end if
+        end if
+
         if row.flashTicks > 0
             active = true
             row.flashTicks = row.flashTicks - 1
@@ -311,7 +325,6 @@ sub onPopTick()
 
             if row.flashTicks <= 0
                 row.pts.color = row.baseColor
-                row.tri.visible = false
                 row.ptsGroup.scale = [1, 1]
             end if
         end if
@@ -341,10 +354,8 @@ sub onPopTick()
     if not active then m.popTimer.control = TimerControl.STOP
 end sub
 
-' pointsColor: dim until a player has scored, green once they beat their projection, red below zero
+' pointsColor: dim until a player has scored, otherwise white (green and red only appear during a score-change animation)
 function pointsColor(state as string) as string
-    if state = "beat" then return COLOR_LEADING
-    if state = "negative" then return COLOR_NEGATIVE
     if state = "zero" then return COLOR_DIM
     return COLOR_NEUTRAL
 end function
@@ -387,7 +398,7 @@ function getRow(index as integer) as object
     group.appendChild(tri)
     m.rowsGroup.appendChild(group)
 
-    row = { group: group, logo: logo, name: nameLabel, proj: projLabel, pts: ptsLabel, ptsGroup: ptsGroup, tri: tri, flashTicks: 0, popStep: -1, baseColor: COLOR_NEUTRAL }
+    row = { group: group, logo: logo, name: nameLabel, proj: projLabel, pts: ptsLabel, ptsGroup: ptsGroup, tri: tri, flashTicks: 0, triTicks: 0, popStep: -1, baseColor: COLOR_NEUTRAL }
     layoutRow(row)
     m.rows.push(row)
     return row
